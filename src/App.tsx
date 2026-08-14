@@ -16,6 +16,8 @@ import SettingsPage from './routes/SettingsPage';
 import OrganizationPage from './routes/OrganizationPage';
 import ReferralsPage from './routes/ReferralsPage';
 import WalletsPage from './routes/WalletsPage';
+import PaymentsPage from './routes/PaymentsPage';
+import RefundsPage from './routes/RefundsPage';
 import MenuPage from './routes/MenuPage';
 import ServiceAreasPage from './routes/ServiceAreasPage';
 import DeliveryZonesPage from './routes/DeliveryZonesPage';
@@ -41,6 +43,8 @@ export default function App() {
             <Route path="/organisation" element={<OrganizationPage />} />
             <Route path="/referrals" element={<ReferralsPage />} />
             <Route path="/wallets" element={<WalletsPage />} />
+            <Route path="/payments" element={<PaymentsPage />} />
+            <Route path="/refunds" element={<RefundsPage />} />
             <Route path="/menu" element={<MenuPage />} />
             <Route path="/service-areas" element={<ServiceAreasPage />} />
             <Route path="/delivery-zones" element={<DeliveryZonesPage />} />

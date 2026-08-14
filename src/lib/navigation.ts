@@ -168,22 +168,8 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Payments & Finance',
     items: [
       { to: '/wallets', label: 'Wallets', icon: 'wallet', status: 'live' },
-      {
-        to: '/payments',
-        label: 'Payments',
-        icon: 'card',
-        status: 'soon',
-        phase: 'Phase 6',
-        summary: 'Successful, failed, pending and COD payments with reconciliation.',
-      },
-      {
-        to: '/refunds',
-        label: 'Refunds',
-        icon: 'refund',
-        status: 'soon',
-        phase: 'Phase 6',
-        summary: 'Refund transactions, gateway status and webhook confirmation.',
-      },
+      { to: '/payments', label: 'Payments', icon: 'card', status: 'live' },
+      { to: '/refunds', label: 'Refunds', icon: 'refund', status: 'live' },
       {
         to: '/invoices',
         label: 'Invoices & GST',

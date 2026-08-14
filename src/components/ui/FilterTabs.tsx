@@ -20,7 +20,9 @@ export function FilterTabs<T extends string>({ options, value, onChange }: Filte
                 : 'text-slate-500 hover:bg-mint-mist hover:text-emerald-deep'
             }`}
           >
-            {option.charAt(0).toUpperCase() + option.slice(1)}
+            {/* Status values arrive snake_cased: 'out_for_delivery' reads as a
+                label, not a column name. */}
+            {(option.charAt(0).toUpperCase() + option.slice(1)).replace(/_/g, ' ')}
           </button>
         );
       })}

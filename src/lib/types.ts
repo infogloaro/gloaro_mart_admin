@@ -176,6 +176,96 @@ export interface OrderHistoryResponse {
   history: OrderStatusEvent[];
 }
 
+/** Sprint 3 — Payments & Refunds. Contracts per documents/SPRINT_3_PAYMENTS_SPEC.md */
+
+export type PaymentStatus =
+  | 'created'
+  | 'pending'
+  | 'processing'
+  | 'successful'
+  | 'failed'
+  | 'cancelled'
+  | 'refunded'
+  | 'partially_refunded';
+
+/** One row of the admin payments list. Money is always integer paise. */
+export interface AdminPayment {
+  id: number;
+  checkout_group_id: number;
+  group_reference: string;
+  customer_name: string;
+  customer_email: string;
+  method: string;
+  provider: string;
+  status: PaymentStatus;
+  amount_cents: number;
+  amount_captured_cents: number;
+  amount_refunded_cents: number;
+  failure_reason: string | null;
+  order_count: number;
+  created_at: string;
+}
+
+export interface PaymentLedgerEntry {
+  event: string;
+  amountCents: number;
+  actorRole: string;
+  actorName: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface PaymentAttempt {
+  id: number;
+  method: string;
+  status: string;
+  providerOrderId: string | null;
+  failureReason: string | null;
+  createdAt: string;
+}
+
+export interface PaymentRefundSummary {
+  id: number;
+  orderId: number | null;
+  amountCents: number;
+  status: string;
+  reason: string | null;
+  createdAt: string;
+}
+
+/** The detail endpoint answers camelCase, unlike the list. */
+export interface AdminPaymentDetail {
+  id: number;
+  checkoutGroupId: number;
+  groupReference: string;
+  method: string;
+  provider: string;
+  status: PaymentStatus;
+  amountCents: number;
+  amountCapturedCents: number;
+  amountRefundedCents: number;
+  failureReason: string | null;
+  createdAt: string;
+  attempts: PaymentAttempt[];
+  refunds: PaymentRefundSummary[];
+  ledger: PaymentLedgerEntry[];
+}
+
+export interface AdminRefund {
+  id: number;
+  payment_id: number;
+  order_id: number | null;
+  group_reference: string;
+  customer_name: string;
+  method: string;
+  provider: string;
+  amount_cents: number;
+  reason: string | null;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  provider_refund_id: string | null;
+  created_at: string;
+}
+
 export type MenuLinkType = 'section' | 'category' | 'vendor' | 'url';
 
 /** A row in the customer app's side menu, ordered by sort_order. */
