@@ -7,7 +7,7 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 import { FilterTabs } from '../components/ui/FilterTabs';
 import { Pagination } from '../components/ui/Pagination';
 import { Modal } from '../components/ui/Modal';
-import type { AdminOrderDetail, AdminOrderListRow, Paged } from '../lib/types';
+import type { AdminOrderDetail, AdminOrderListRow, OrderHistoryResponse, Paged } from '../lib/types';
 
 const FILTERS = ['all', 'pending', 'confirmed', 'packed', 'out_for_delivery', 'delivered', 'cancelled'] as const;
 type Filter = (typeof FILTERS)[number];
@@ -23,11 +23,12 @@ function money(cents: number) {
   return `₹${(cents / 100).toFixed(2)}`;
 }
 
-/// Orders placed in one checkout split into one order per shop. Without a
-/// checkout id on the row, siblings are matched by customer and placement time.
-function siblingKey(order: AdminOrderListRow) {
-  return `${order.user_id}|${Math.floor(new Date(order.created_at).getTime() / 5000)}`;
-}
+const ACTOR_TONE: Record<string, string> = {
+  customer: 'bg-navy-2/10 text-navy-2',
+  vendor: 'bg-state-processing/12 text-state-processing-ink',
+  admin: 'bg-gold-soft text-gold-ink',
+  system: 'bg-slate-100 text-slate-500',
+};
 
 export default function OrdersPage() {
   const [filter, setFilter] = useState<Filter>('all');
@@ -35,11 +36,15 @@ export default function OrdersPage() {
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  // Pinning a group narrows the list to the one purchase, however many shops it
+  // was split across. Set by clicking a reference in the table.
+  const [groupRef, setGroupRef] = useState('');
   const debouncedSearch = useDebounced(search);
 
   const qs = new URLSearchParams({
     ...(filter === 'all' ? {} : { status: filter }),
     ...(debouncedSearch.trim() ? { q: debouncedSearch.trim() } : {}),
+    ...(groupRef ? { groupRef } : {}),
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
     page: String(page),
@@ -49,6 +54,7 @@ export default function OrdersPage() {
     filter,
     page,
     debouncedSearch,
+    groupRef,
     from,
     to,
   ]);
@@ -56,14 +62,6 @@ export default function OrdersPage() {
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [viewing, setViewing] = useState<AdminOrderListRow | null>(null);
   const [dispatching, setDispatching] = useState<AdminOrderListRow | null>(null);
-
-  // Orders sharing a checkout, so ops can see this is one customer's basket
-  // split across shops rather than several unrelated orders.
-  const siblingCounts = new Map<string, number>();
-  for (const order of data?.items ?? []) {
-    const key = siblingKey(order);
-    siblingCounts.set(key, (siblingCounts.get(key) ?? 0) + 1);
-  }
 
   async function setStatus(order: AdminOrderListRow, status: string, extra?: Record<string, unknown>) {
     setActionError(null);
@@ -88,12 +86,13 @@ export default function OrdersPage() {
     setStatus(order, next);
   }
 
-  const hasFilters = Boolean(debouncedSearch.trim() || from || to || filter !== 'all');
+  const hasFilters = Boolean(debouncedSearch.trim() || from || to || groupRef || filter !== 'all');
 
   function clearFilters() {
     setSearch('');
     setFrom('');
     setTo('');
+    setGroupRef('');
     setFilter('all');
     setPage(1);
   }
@@ -118,7 +117,7 @@ export default function OrdersPage() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            placeholder="Order number, customer or shop"
+            placeholder="Order number, group reference, customer or shop"
             className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-sm"
           />
         </div>
@@ -146,6 +145,19 @@ export default function OrdersPage() {
             className="rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-sm"
           />
         </div>
+        {groupRef && (
+          <button
+            onClick={() => {
+              setGroupRef('');
+              setPage(1);
+            }}
+            title="Stop filtering by this checkout"
+            className="flex items-center gap-1.5 rounded-lg border border-gold/50 bg-gold-soft px-3 py-2 text-xs font-bold text-gold-ink"
+          >
+            <span className="font-mono">{groupRef}</span>
+            <span className="text-sm leading-none">×</span>
+          </button>
+        )}
         {hasFilters && (
           <button
             onClick={clearFilters}
@@ -169,24 +181,39 @@ export default function OrdersPage() {
             columns={[
               {
                 header: 'Order #',
-                render: (o) => {
-                  const siblings = siblingCounts.get(siblingKey(o)) ?? 1;
-                  return (
+                render: (o) => (
+                  <button onClick={() => setViewing(o)} className="font-medium text-navy-2 hover:underline">
+                    #{o.id}
+                  </button>
+                ),
+              },
+              {
+                header: 'Group',
+                render: (o) =>
+                  o.checkout_group_reference ? (
                     <div>
-                      <button onClick={() => setViewing(o)} className="font-medium text-brand-navy hover:underline">
-                        #{o.id}
+                      <button
+                        onClick={() => {
+                          setGroupRef(o.checkout_group_reference!);
+                          setPage(1);
+                        }}
+                        title="Show every order from this checkout"
+                        className="font-mono text-[11px] font-semibold text-navy-2 hover:underline"
+                      >
+                        {o.checkout_group_reference}
                       </button>
-                      {siblings > 1 && (
+                      {o.checkout_group_order_count > 1 && (
                         <div
                           title="One checkout split across several shops — each ships and invoices separately."
-                          className="mt-0.5 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600"
+                          className="mt-0.5 text-[11px] text-slate-500"
                         >
-                          1 of {siblings} in checkout
+                          1 of {o.checkout_group_order_count} shops
                         </div>
                       )}
                     </div>
-                  );
-                },
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  ),
               },
               {
                 header: 'Vendor',
@@ -358,6 +385,48 @@ function DispatchModal({
   );
 }
 
+/**
+ * The order's audit trail. Read from /api/orders/:id/history rather than the
+ * order row, so it shows every move — including ones later overwritten — with
+ * who made it.
+ */
+function StatusTimeline({ orderId }: { orderId: number }) {
+  const { data, loading, error } = useApiData<OrderHistoryResponse>(`/api/orders/${orderId}/history`, [orderId]);
+
+  if (loading) return <div className="py-3 text-xs font-medium text-slate-400">Loading timeline…</div>;
+  // A missing timeline must not read as "nothing happened".
+  if (error) return <div className="py-3 text-xs font-medium text-slate-400">Timeline unavailable: {error}</div>;
+  if (!data?.history.length) return <div className="py-3 text-xs font-medium text-slate-400">No status changes recorded.</div>;
+
+  return (
+    <ol className="space-y-3">
+      {data.history.map((e, i) => (
+        <li key={i} className="relative flex gap-3 pl-1">
+          {/* Connector, drawn for every entry but the last. */}
+          {i < data.history.length - 1 && <span className="absolute top-5 left-[9px] h-full w-px bg-slate-200" />}
+          <span className="relative z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-navy-2 ring-3 ring-white" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={e.toStatus} />
+              {e.fromStatus && <span className="text-[11px] text-slate-400">from {e.fromStatus.replace(/_/g, ' ')}</span>}
+              <span
+                className={`rounded-full px-1.5 py-px text-[9px] font-bold uppercase ${ACTOR_TONE[e.actorRole] ?? ACTOR_TONE.system}`}
+              >
+                {e.actorRole}
+              </span>
+            </div>
+            <div className="mt-0.5 text-[11px] text-slate-500">
+              {new Date(e.createdAt).toLocaleString()}
+              {e.actorName ? ` · ${e.actorName}` : ''}
+              {e.note ? ` · ${e.note}` : ''}
+            </div>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function OrderDetailModal({ orderId, onClose }: { orderId: number; onClose: () => void }) {
   const { data: order, loading, error } = useApiData<AdminOrderDetail>(`/api/admin/orders/${orderId}`, [orderId]);
 
@@ -367,9 +436,15 @@ function OrderDetailModal({ orderId, onClose }: { orderId: number; onClose: () =
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">{error}</div>}
       {order && (
         <div className="space-y-4 text-sm">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <StatusBadge status={order.status} />
             <span className="text-slate-500">Placed {new Date(order.created_at).toLocaleString()}</span>
+            {order.checkout_group_reference && (
+              <span className="ml-auto rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                <span className="font-mono">{order.checkout_group_reference}</span>
+                {order.checkout_group_order_count > 1 && ` · 1 of ${order.checkout_group_order_count} shops`}
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -445,6 +520,11 @@ function OrderDetailModal({ orderId, onClose }: { orderId: number; onClose: () =
               <span>{money(order.total_cents)}</span>
             </div>
             <div className="pt-1 text-xs text-slate-500">Payment: {order.payment_method.toUpperCase()}</div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 p-3">
+            <div className="mb-3 text-xs font-semibold text-slate-500 uppercase">Status timeline</div>
+            <StatusTimeline orderId={orderId} />
           </div>
         </div>
       )}

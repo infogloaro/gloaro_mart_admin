@@ -128,6 +128,9 @@ export interface AdminOrder {
   delivery_partner_phone: string | null;
   estimated_delivery_at: string | null;
   coupon_code_snapshot: string | null;
+  /** The purchase this vendor order belongs to. Every order has one — legacy
+   *  rows were backfilled with a GLM-LEGACY- reference. */
+  checkout_group_id: number;
   created_at: string;
   updated_at: string;
 }
@@ -137,6 +140,20 @@ export interface AdminOrderListRow extends AdminOrder {
   customer_email: string;
   vendor_name: string;
   vendor_city: string | null;
+  /** Human-facing group reference, e.g. GLM-2026-00001. */
+  checkout_group_reference: string | null;
+  /** How many vendor orders that one checkout produced. */
+  checkout_group_order_count: number;
+}
+
+/** One entry in an order's status timeline. */
+export interface OrderStatusEvent {
+  fromStatus: string | null;
+  toStatus: string;
+  actorRole: 'customer' | 'vendor' | 'admin' | 'system';
+  actorName: string | null;
+  note: string | null;
+  createdAt: string;
 }
 
 export interface OrderItem {
@@ -153,6 +170,10 @@ export interface AdminOrderDetail extends AdminOrderListRow {
   customer_phone: string | null;
   vendor_city: string | null;
   items: OrderItem[];
+}
+
+export interface OrderHistoryResponse {
+  history: OrderStatusEvent[];
 }
 
 export type MenuLinkType = 'section' | 'category' | 'vendor' | 'url';
