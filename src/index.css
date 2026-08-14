@@ -1,0 +1,307 @@
+@import "tailwindcss";
+
+/*
+ * GLOARO MART Admin — Deep Navy shell · Royal Gold accent
+ *
+ * Three things happen here:
+ *  1. The `navy` / `gold` tokens define the brand, taken from the logo.
+ *  2. The stock `slate` scale is re-pointed at cool blue-greys so every neutral
+ *     in the panel sits under the navy shell instead of fighting it.
+ *  3. The older `emerald` / `mint` accent names are kept as aliases onto the new
+ *     brand. Twenty-odd pages style themselves with those tokens, so retinting
+ *     at the token level rethemes the whole console instead of rewriting a few
+ *     hundred class strings. New work should use `navy-*` / `gold-*`.
+ *
+ * The rules the palette follows:
+ *   navy = navigation, shell, primary action — the structure
+ *   gold = "you are here", money, and the one highlight per view
+ *   status colours = state only, never decoration
+ */
+@theme {
+  /* --- Shell: deep navy --- */
+  --color-navy: #071a33;
+  --color-navy-deep: #05142a;
+  --color-navy-2: #0d294d;
+  --color-navy-light: #173b68;
+  --color-navy-line: #1e4675;
+
+  /* --- Royal Gold --- */
+  --color-gold: #f2b233;
+  --color-gold-deep: #d99212;
+  --color-gold-soft: #fff3d6;
+  --color-gold-mist: #fffaf0;
+  /*
+   * Gold for type on a light surface. The brand golds are fills: #D99212 on
+   * white is 2.6:1 and on gold-soft 2.4:1, which no amount of weight rescues at
+   * badge sizes. This is the same hue carried down to ~5.9:1 — glyphs and fills
+   * keep `gold-deep`, words take this.
+   */
+  --color-gold-ink: #8a5a06;
+
+  /* --- Surfaces --- */
+  --color-canvas: #f6f8fc;
+  --color-surface: #ffffff;
+  --color-ink: #17243a;
+  --color-muted: #6b778c;
+
+  /* --- Status: state only --- */
+  --color-state-success: #1f9d68;
+  --color-state-processing: #2563eb;
+  --color-state-shipped: #f59e0b;
+  --color-state-pending: #7c3aed;
+  --color-state-error: #e5484d;
+
+  /*
+   * Darkened twins for text. The base colours are picked to read as fills —
+   * as 10px uppercase type on their own soft tint they fall under 4.5:1, so
+   * pills and labels use these instead.
+   */
+  --color-state-success-ink: #12704a;
+  --color-state-processing-ink: #1d4ed8;
+  --color-state-shipped-ink: #a95f09;
+  --color-state-pending-ink: #6320d1;
+  --color-state-error-ink: #b4232a;
+
+  /* --- Legacy accent aliases: old names, new brand --- */
+  --color-shell: #071a33;
+  --color-shell-deep: #05142a;
+  --color-shell-soft: #0d294d;
+  --color-shell-line: #1e4675;
+  --color-emerald: #0d294d;
+  --color-emerald-deep: #071a33;
+  --color-mint: #173b68;
+  --color-mint-soft: #c6d6ec;
+  --color-mint-mist: #eef3fb;
+  --color-brand-navy: #071a33;
+  --color-brand-navy-dark: #05142a;
+  --color-brand-amber: #f2b233;
+
+  /* --- Neutrals: cool blue-grey, so they sit under the canvas --- */
+  --color-slate-50: #f6f8fc;
+  --color-slate-100: #eef2f9;
+  --color-slate-200: #e5eaf2;
+  --color-slate-300: #cbd5e6;
+  --color-slate-400: #98a4b8;
+  --color-slate-500: #6b778c;
+  --color-slate-600: #55617a;
+  --color-slate-700: #3a4560;
+  --color-slate-800: #17243a;
+  --color-slate-900: #0d1730;
+
+  /* --- Motion --- */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-fade-up: fade-up 0.42s var(--ease-out-soft) both;
+  --animate-fade-in: fade-in 0.3s ease-out both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-pulse-soft: pulse-soft 2.6s ease-in-out infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: -180% 0;
+    }
+    to {
+      background-position: 180% 0;
+    }
+  }
+  @keyframes pulse-soft {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Slim, theme-tinted scrollbars — the sidebar is long enough to need one. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-slate-300) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-slate-300);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-slate-400);
+}
+.scrollbar-shell {
+  scrollbar-color: var(--color-navy-line) transparent;
+}
+.scrollbar-shell::-webkit-scrollbar-thumb {
+  background: var(--color-navy-line);
+}
+
+::selection {
+  background: var(--color-gold-soft);
+  color: var(--color-navy);
+}
+
+/*
+ * Unlayered so it beats Tailwind's utility layer: every control in the panel
+ * gets the same focus ring and easing without editing each page.
+ */
+:is(input, select, textarea):focus-visible {
+  outline: none;
+  border-color: var(--color-navy-2);
+  box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--color-navy-2) 14%, transparent);
+}
+/*
+ * Transition only — deliberately no `background` here. This rule is unlayered,
+ * so setting a background would beat every `bg-*` utility and, for example,
+ * paint the shell sidebar's search field white behind its white text.
+ */
+:is(input, select, textarea) {
+  transition:
+    border-color 0.18s var(--ease-out-soft),
+    box-shadow 0.18s var(--ease-out-soft);
+}
+button:not(:disabled) {
+  cursor: pointer;
+  transition:
+    background-color 0.2s var(--ease-out-soft),
+    color 0.2s var(--ease-out-soft),
+    border-color 0.2s var(--ease-out-soft),
+    box-shadow 0.2s var(--ease-out-soft),
+    transform 0.2s var(--ease-out-soft),
+    opacity 0.2s var(--ease-out-soft);
+}
+button:focus-visible {
+  outline: 2px solid var(--color-gold-deep);
+  outline-offset: 2px;
+}
+
+@utility card {
+  border-radius: 1rem;
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-surface);
+  box-shadow:
+    0 1px 2px rgb(15 35 60 / 0.04),
+    0 8px 24px -18px rgb(15 35 60 / 0.2);
+}
+
+/* Lift on hover, for cards that are actually interactive. */
+@utility card-interactive {
+  transition:
+    transform 0.24s var(--ease-out-soft),
+    box-shadow 0.24s var(--ease-out-soft),
+    border-color 0.24s var(--ease-out-soft);
+  &:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-slate-300);
+    box-shadow: 0 12px 30px rgb(15 35 60 / 0.1);
+  }
+}
+
+/*
+ * Deep Navy action with a gold-lit hover: the accent arrives as a warm rim and
+ * shadow rather than a fill, so gold stays the highlight and never the button.
+ */
+@utility btn-primary {
+  border-radius: 0.625rem;
+  background-color: var(--color-navy-2);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(7 26 51 / 0.16);
+  &:hover:not(:disabled) {
+    background-color: var(--color-navy-light);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-gold) 55%, transparent),
+      0 10px 24px -12px rgb(7 26 51 / 0.55);
+  }
+  &:active:not(:disabled) {
+    transform: translateY(0.5px);
+  }
+  &:disabled {
+    opacity: 0.5;
+    box-shadow: none;
+  }
+}
+
+/*
+ * The dark shell used by the sidebar rail and hero panels.
+ *
+ * Deliberately restrained: a saturated wash here pulls the eye to the chrome
+ * instead of the data. Two navy stops are all the depth this needs.
+ */
+@utility gradient-shell {
+  background-color: var(--color-navy);
+  background-image: linear-gradient(180deg, #071a33 0%, #0a2140 100%);
+}
+
+/*
+ * The active nav item, and nothing else on the rail.
+ *
+ * The spec's left stop is gold at 0.20, but that lands as near-navy over the
+ * shell and the label — dark ink on gold everywhere else — becomes unreadable
+ * on the first third of the row. The floor is raised to 0.72 so the row still
+ * reads as one gold sweep, left-soft to right-solid, at full contrast.
+ */
+@utility gradient-gold-active {
+  background-image: linear-gradient(90deg, rgb(242 178 51 / 0.72), var(--color-gold));
+}
+
+/* Legacy alias — the avatar chip and any page still asking for the old accent. */
+@utility gradient-emerald {
+  background-image: linear-gradient(135deg, var(--color-navy-2) 0%, var(--color-navy-light) 100%);
+}
+
+/* Money surfaces: revenue hero, wallet balances, settlement totals. */
+@utility gradient-gold {
+  background-image: linear-gradient(135deg, var(--color-gold) 0%, var(--color-gold-soft) 100%);
+}
+
+@utility skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-slate-100) 25%,
+    var(--color-slate-200) 37%,
+    var(--color-slate-100) 63%
+  );
+  background-size: 300% 100%;
+  animation: var(--animate-shimmer);
+  border-radius: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
