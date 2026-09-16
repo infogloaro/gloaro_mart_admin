@@ -4,6 +4,7 @@ import { useApiData } from '../lib/useApiData';
 import { DataTable } from '../components/ui/DataTable';
 import { Modal } from '../components/ui/Modal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { useCan } from '../lib/staffContext';
 import type { Category } from '../lib/types';
 
 const ICON_OPTIONS = [
@@ -12,6 +13,7 @@ const ICON_OPTIONS = [
 ];
 
 export default function CategoriesPage() {
+  const can = useCan('categories');
   const { data: categories, loading, error, reload } = useApiData<Category[]>('/api/admin/categories');
   const [formFor, setFormFor] = useState<{ mode: 'create' } | { mode: 'edit'; category: Category } | null>(null);
   const [deleting, setDeleting] = useState<Category | null>(null);
@@ -79,12 +81,14 @@ export default function CategoriesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-extrabold tracking-tight text-ink">Categories</h1>
-        <button
-          onClick={() => setFormFor({ mode: 'create' })}
-          className="btn-primary px-4 py-2 text-sm"
-        >
-          + New Category
-        </button>
+        {can.edit && (
+          <button
+            onClick={() => setFormFor({ mode: 'create' })}
+            className="btn-primary px-4 py-2 text-sm"
+          >
+            + New Category
+          </button>
+        )}
       </div>
 
       {actionError && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">{actionError}</div>}
@@ -101,22 +105,26 @@ export default function CategoriesPage() {
                 render: (c) => (
                   <div className="flex items-center gap-1">
                     <span className="w-6">{c.sort_order}</span>
-                    <button
-                      disabled={pendingId === c.id}
-                      onClick={() => move(c, -1)}
-                      className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 hover:border-emerald hover:bg-mint-mist hover:text-emerald-deep disabled:opacity-50"
-                      aria-label={`Move ${c.name} up`}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      disabled={pendingId === c.id}
-                      onClick={() => move(c, 1)}
-                      className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 hover:border-emerald hover:bg-mint-mist hover:text-emerald-deep disabled:opacity-50"
-                      aria-label={`Move ${c.name} down`}
-                    >
-                      ↓
-                    </button>
+                    {can.edit && (
+                      <>
+                        <button
+                          disabled={pendingId === c.id}
+                          onClick={() => move(c, -1)}
+                          className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 hover:border-emerald hover:bg-mint-mist hover:text-emerald-deep disabled:opacity-50"
+                          aria-label={`Move ${c.name} up`}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          disabled={pendingId === c.id}
+                          onClick={() => move(c, 1)}
+                          className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 hover:border-emerald hover:bg-mint-mist hover:text-emerald-deep disabled:opacity-50"
+                          aria-label={`Move ${c.name} down`}
+                        >
+                          ↓
+                        </button>
+                      </>
+                    )}
                   </div>
                 ),
               },
@@ -136,30 +144,37 @@ export default function CategoriesPage() {
                 header: 'Actions',
                 render: (c) => (
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => setFormFor({ mode: 'edit', category: c })}
-                      className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      disabled={pendingId === c.id}
-                      onClick={() => toggleActive(c)}
-                      className={`rounded-md px-3 py-1 text-xs font-medium disabled:opacity-50 ${
-                        c.is_active
-                          ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                      }`}
-                    >
-                      {c.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button
-                      disabled={pendingId === c.id}
-                      onClick={() => setDeleting(c)}
-                      className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 hover:text-rose-700 disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
+                    {can.edit && (
+                      <>
+                        <button
+                          onClick={() => setFormFor({ mode: 'edit', category: c })}
+                          className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          disabled={pendingId === c.id}
+                          onClick={() => toggleActive(c)}
+                          className={`rounded-md px-3 py-1 text-xs font-medium disabled:opacity-50 ${
+                            c.is_active
+                              ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                          }`}
+                        >
+                          {c.is_active ? 'Deactivate' : 'Activate'}
+                        </button>
+                      </>
+                    )}
+                    {can.delete && (
+                      <button
+                        disabled={pendingId === c.id}
+                        onClick={() => setDeleting(c)}
+                        className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 hover:text-rose-700 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    )}
+                    {!can.edit && !can.delete && <span className="text-xs text-slate-400">View only</span>}
                   </div>
                 ),
               },

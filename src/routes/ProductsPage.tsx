@@ -6,6 +6,7 @@ import { DataTable } from '../components/ui/DataTable';
 import { Modal } from '../components/ui/Modal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Pagination } from '../components/ui/Pagination';
+import { useCan } from '../lib/staffContext';
 import type { AdminProduct, AdminProductDetail, AdminVendor, Brand, Category, Paged, PriceTier } from '../lib/types';
 
 function money(cents: number) {
@@ -25,6 +26,7 @@ function centsToRupees(cents: number): string {
 type StatusFilter = 'all' | 'active' | 'inactive';
 
 export default function ProductsPage() {
+  const can = useCan('products');
   const [q, setQ] = useState('');
   const debouncedQ = useDebounced(q);
   const [vendorId, setVendorId] = useState('');
@@ -110,12 +112,14 @@ export default function ProductsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-extrabold tracking-tight text-ink">Products</h1>
-        <button
-          onClick={() => setFormFor({ mode: 'create' })}
-          className="btn-primary px-4 py-2 text-sm"
-        >
-          + Add Product
-        </button>
+        {can.edit && (
+          <button
+            onClick={() => setFormFor({ mode: 'create' })}
+            className="btn-primary px-4 py-2 text-sm"
+          >
+            + Add Product
+          </button>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -231,31 +235,38 @@ export default function ProductsPage() {
                 header: 'Actions',
                 render: (p) => (
                   <div className="flex gap-2">
-                    <button
-                      disabled={pendingId === p.id}
-                      onClick={() => setFormFor({ mode: 'edit', product: p })}
-                      className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      disabled={pendingId === p.id}
-                      onClick={() => toggleActive(p)}
-                      className={`rounded-md px-3 py-1 text-xs font-medium disabled:opacity-50 ${
-                        p.is_active
-                          ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                      }`}
-                    >
-                      {p.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button
-                      disabled={pendingId === p.id}
-                      onClick={() => setDeleting(p)}
-                      className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 hover:text-rose-700 disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
+                    {can.edit && (
+                      <>
+                        <button
+                          disabled={pendingId === p.id}
+                          onClick={() => setFormFor({ mode: 'edit', product: p })}
+                          className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          disabled={pendingId === p.id}
+                          onClick={() => toggleActive(p)}
+                          className={`rounded-md px-3 py-1 text-xs font-medium disabled:opacity-50 ${
+                            p.is_active
+                              ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                          }`}
+                        >
+                          {p.is_active ? 'Deactivate' : 'Activate'}
+                        </button>
+                      </>
+                    )}
+                    {can.delete && (
+                      <button
+                        disabled={pendingId === p.id}
+                        onClick={() => setDeleting(p)}
+                        className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 hover:text-rose-700 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    )}
+                    {!can.edit && !can.delete && <span className="text-xs text-slate-400">View only</span>}
                   </div>
                 ),
               },

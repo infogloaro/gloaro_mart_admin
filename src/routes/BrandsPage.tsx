@@ -4,9 +4,11 @@ import { useApiData } from '../lib/useApiData';
 import { DataTable } from '../components/ui/DataTable';
 import { Modal } from '../components/ui/Modal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { useCan } from '../lib/staffContext';
 import type { Brand } from '../lib/types';
 
 export default function BrandsPage() {
+  const can = useCan('brands');
   const { data: brands, loading, error, reload } = useApiData<Brand[]>('/api/admin/brands');
   const [formFor, setFormFor] = useState<{ mode: 'create' } | { mode: 'edit'; brand: Brand } | null>(null);
   const [deleting, setDeleting] = useState<Brand | null>(null);
@@ -58,9 +60,11 @@ export default function BrandsPage() {
             The brand master used by products. Vendors pick from this list — they cannot invent their own.
           </p>
         </div>
-        <button onClick={() => setFormFor({ mode: 'create' })} className="btn-primary px-4 py-2 text-sm">
-          + New Brand
-        </button>
+        {can.edit && (
+          <button onClick={() => setFormFor({ mode: 'create' })} className="btn-primary px-4 py-2 text-sm">
+            + New Brand
+          </button>
+        )}
       </div>
 
       <input
@@ -134,35 +138,42 @@ export default function BrandsPage() {
                 header: 'Actions',
                 render: (b) => (
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => setFormFor({ mode: 'edit', brand: b })}
-                      className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      disabled={pendingId === b.id}
-                      onClick={() => toggleActive(b)}
-                      className={`rounded-md px-3 py-1 text-xs font-medium disabled:opacity-50 ${
-                        b.is_active
-                          ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                      }`}
-                    >
-                      {b.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button
-                      disabled={pendingId === b.id || b.product_count > 0}
-                      onClick={() => setDeleting(b)}
-                      title={
-                        b.product_count > 0
-                          ? `${b.product_count} product(s) still use this brand — deactivate it instead.`
-                          : undefined
-                      }
-                      className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 hover:text-rose-700 disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
+                    {can.edit && (
+                      <>
+                        <button
+                          onClick={() => setFormFor({ mode: 'edit', brand: b })}
+                          className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          disabled={pendingId === b.id}
+                          onClick={() => toggleActive(b)}
+                          className={`rounded-md px-3 py-1 text-xs font-medium disabled:opacity-50 ${
+                            b.is_active
+                              ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                          }`}
+                        >
+                          {b.is_active ? 'Deactivate' : 'Activate'}
+                        </button>
+                      </>
+                    )}
+                    {can.delete && (
+                      <button
+                        disabled={pendingId === b.id || b.product_count > 0}
+                        onClick={() => setDeleting(b)}
+                        title={
+                          b.product_count > 0
+                            ? `${b.product_count} product(s) still use this brand — deactivate it instead.`
+                            : undefined
+                        }
+                        className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 hover:text-rose-700 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    )}
+                    {!can.edit && !can.delete && <span className="text-xs text-slate-400">View only</span>}
                   </div>
                 ),
               },

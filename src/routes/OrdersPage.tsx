@@ -7,6 +7,7 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 import { FilterTabs } from '../components/ui/FilterTabs';
 import { Pagination } from '../components/ui/Pagination';
 import { Modal } from '../components/ui/Modal';
+import { useCan } from '../lib/staffContext';
 import type { AdminOrderDetail, AdminOrderListRow, OrderHistoryResponse, Paged } from '../lib/types';
 
 const FILTERS = ['all', 'pending', 'confirmed', 'packed', 'out_for_delivery', 'delivered', 'cancelled'] as const;
@@ -31,6 +32,7 @@ const ACTOR_TONE: Record<string, string> = {
 };
 
 export default function OrdersPage() {
+  const can = useCan('orders');
   const [filter, setFilter] = useState<Filter>('all');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -249,7 +251,7 @@ export default function OrdersPage() {
                       >
                         View
                       </button>
-                      {next && (
+                      {can.edit && next && (
                         <button
                           disabled={pendingId === o.id}
                           onClick={() => advance(o, next)}
@@ -258,7 +260,7 @@ export default function OrdersPage() {
                           {next === 'out_for_delivery' ? 'Dispatch' : `Mark ${next.replace('_', ' ')}`}
                         </button>
                       )}
-                      {canCancel && (
+                      {can.edit && canCancel && (
                         <button
                           disabled={pendingId === o.id}
                           onClick={() => setStatus(o, 'cancelled')}

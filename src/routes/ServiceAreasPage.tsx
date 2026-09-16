@@ -6,6 +6,7 @@ import { Icon } from '../components/ui/Icon';
 import { VendorPicker } from '../components/ui/VendorPicker';
 import { PendingApiNotice } from '../components/ui/PendingApiNotice';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { useCan } from '../lib/staffContext';
 import type { AdminVendor, VendorServiceArea } from '../lib/types';
 
 const ENDPOINTS = [
@@ -15,6 +16,7 @@ const ENDPOINTS = [
 ];
 
 export default function ServiceAreasPage() {
+  const can = useCan('vendors');
   const [vendor, setVendor] = useState<AdminVendor | null>(null);
   const [areaType, setAreaType] = useState<'radius' | 'pincode'>('radius');
   const [radiusKm, setRadiusKm] = useState('5');
@@ -122,6 +124,7 @@ export default function ServiceAreasPage() {
             </div>
           )}
 
+          {can.edit && (
           <form onSubmit={addArea} className="card p-4">
             <h2 className="mb-3 text-sm font-bold text-ink">Add a rule</h2>
             <div className="mb-3 inline-flex gap-1 rounded-xl border border-slate-200 bg-white p-1">
@@ -178,6 +181,7 @@ export default function ServiceAreasPage() {
               Radius needs the customer's coordinates; pincode works without them.
             </p>
           </form>
+          )}
 
           {loading && <div className="p-8 text-center text-sm font-medium text-slate-400">Loading…</div>}
 
@@ -221,14 +225,17 @@ export default function ServiceAreasPage() {
                   {
                     header: '',
                     className: 'text-right',
-                    render: (a) => (
-                      <button
-                        onClick={() => setDeleting(a)}
-                        className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 hover:text-rose-700"
-                      >
-                        Remove
-                      </button>
-                    ),
+                    render: (a) =>
+                      can.delete ? (
+                        <button
+                          onClick={() => setDeleting(a)}
+                          className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 hover:text-rose-700"
+                        >
+                          Remove
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      ),
                   },
                 ]}
               />

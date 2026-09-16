@@ -211,8 +211,10 @@ function TopProductList({ items, byRevenue }: { items: TopProduct[]; byRevenue: 
           : p.revenueCents != null
             ? money(p.revenueCents)
             : null;
+        // The same product can rank twice — once per vendor selling it — so the
+        // id alone is not unique. Rank is, within one ordered list.
         return (
-          <li key={p.productId}>
+          <li key={`${p.productId}-${i}`}>
             <div className="flex items-center gap-3">
               {/* No product image on this endpoint — the rank tile stands in for it. */}
               <span

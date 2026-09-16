@@ -4,6 +4,7 @@ import { useApiData } from '../lib/useApiData';
 import { Icon } from '../components/ui/Icon';
 import { VendorPicker } from '../components/ui/VendorPicker';
 import { PendingApiNotice } from '../components/ui/PendingApiNotice';
+import { useCan } from '../lib/staffContext';
 import type { AdminVendor, VendorDeliveryRules } from '../lib/types';
 
 const ENDPOINTS = [
@@ -54,6 +55,7 @@ const BLANK: FormState = {
 };
 
 export default function DeliveryZonesPage() {
+  const can = useCan('vendors');
   const [vendor, setVendor] = useState<AdminVendor | null>(null);
   const [form, setForm] = useState<FormState>(BLANK);
   const [saving, setSaving] = useState(false);
@@ -171,6 +173,10 @@ export default function DeliveryZonesPage() {
 
       {vendor && !loading && !error && (
         <form onSubmit={save} className="space-y-4">
+          <fieldset disabled={!can.edit} className="space-y-4">
+          {!can.edit && (
+            <p className="text-xs text-slate-400">View only — your role cannot change delivery settings.</p>
+          )}
           <section className="card p-5">
             <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-ink">
               <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald/10 text-emerald">
@@ -327,6 +333,7 @@ export default function DeliveryZonesPage() {
               </span>
             )}
           </div>
+          </fieldset>
         </form>
       )}
     </div>

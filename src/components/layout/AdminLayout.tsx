@@ -6,6 +6,7 @@ import { ErrorBoundary } from '../ui/ErrorBoundary';
 import { Icon } from '../ui/Icon';
 import { getValidAdminPayload } from '../../lib/auth';
 import { findNavGroup, findNavItem } from '../../lib/navigation';
+import { StaffMeProvider, useStaffMe } from '../../lib/staffContext';
 
 function initialsOf(email?: string) {
   if (!email) return 'AD';
@@ -30,7 +31,16 @@ function HeaderAction({ icon, label, to }: { icon: Parameters<typeof Icon>[0]['n
 }
 
 export function AdminLayout() {
+  return (
+    <StaffMeProvider>
+      <AdminLayoutContent />
+    </StaffMeProvider>
+  );
+}
+
+function AdminLayoutContent() {
   const payload = getValidAdminPayload();
+  const me = useStaffMe();
   const { pathname } = useLocation();
   const item = findNavItem(pathname);
   const group = findNavGroup(pathname);
@@ -82,7 +92,9 @@ export function AdminLayout() {
             </div>
             <div className="hidden text-right leading-tight sm:block">
               <div className="text-xs font-semibold text-ink">{payload?.email ?? 'Administrator'}</div>
-              <div className="text-[10px] font-medium text-slate-400">Super Admin</div>
+              <div className="text-[10px] font-medium text-slate-400">
+                {me?.isSuperAdmin ? 'Super Admin' : (me?.role?.name ?? 'Administrator')}
+              </div>
             </div>
             <div className="gradient-emerald flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white ring-2 ring-gold/30">
               {initialsOf(payload?.email)}

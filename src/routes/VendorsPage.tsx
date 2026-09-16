@@ -4,6 +4,7 @@ import { useApiData } from '../lib/useApiData';
 import { DataTable } from '../components/ui/DataTable';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { FilterTabs } from '../components/ui/FilterTabs';
+import { useCan } from '../lib/staffContext';
 import type { AdminVendor } from '../lib/types';
 
 const FILTERS = ['pending', 'approved', 'rejected', 'suspended', 'all'] as const;
@@ -12,6 +13,7 @@ type Filter = (typeof FILTERS)[number];
 const hasPin = (v: AdminVendor) => v.latitude != null && v.longitude != null;
 
 export default function VendorsPage() {
+  const can = useCan('vendors');
   const [filter, setFilter] = useState<Filter>('pending');
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
@@ -79,52 +81,55 @@ export default function VendorsPage() {
               { header: 'Submitted', render: (v) => new Date(v.created_at).toLocaleDateString() },
               {
                 header: 'Actions',
-                render: (v) => (
-                  <div className="flex flex-wrap gap-2">
-                    {v.status === 'pending' && (
-                      <>
+                render: (v) =>
+                  can.edit ? (
+                    <div className="flex flex-wrap gap-2">
+                      {v.status === 'pending' && (
+                        <>
+                          <button
+                            disabled={pendingId === v.id}
+                            onClick={() => updateStatus(v, 'approved')}
+                            className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            disabled={pendingId === v.id}
+                            onClick={() => updateStatus(v, 'rejected')}
+                            className="rounded-lg bg-gradient-to-r from-rose-500 to-rose-600 px-3 py-1 text-xs font-semibold text-white shadow-[0_6px_16px_-8px_rgba(225,29,72,0.9)] hover:brightness-105 disabled:opacity-50 disabled:shadow-none"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
+                      {v.status === 'approved' && (
+                        <button
+                          disabled={pendingId === v.id}
+                          onClick={() => updateStatus(v, 'suspended')}
+                          className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 hover:text-rose-700 disabled:opacity-50"
+                        >
+                          Suspend
+                        </button>
+                      )}
+                      {v.status === 'suspended' && (
                         <button
                           disabled={pendingId === v.id}
                           onClick={() => updateStatus(v, 'approved')}
                           className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                         >
-                          Approve
+                          Reinstate
                         </button>
-                        <button
-                          disabled={pendingId === v.id}
-                          onClick={() => updateStatus(v, 'rejected')}
-                          className="rounded-lg bg-gradient-to-r from-rose-500 to-rose-600 px-3 py-1 text-xs font-semibold text-white shadow-[0_6px_16px_-8px_rgba(225,29,72,0.9)] hover:brightness-105 disabled:opacity-50 disabled:shadow-none"
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
-                    {v.status === 'approved' && (
+                      )}
                       <button
-                        disabled={pendingId === v.id}
-                        onClick={() => updateStatus(v, 'suspended')}
-                        className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 hover:text-rose-700 disabled:opacity-50"
+                        onClick={() => setEditing(v)}
+                        className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200"
                       >
-                        Suspend
+                        Edit
                       </button>
-                    )}
-                    {v.status === 'suspended' && (
-                      <button
-                        disabled={pendingId === v.id}
-                        onClick={() => updateStatus(v, 'approved')}
-                        className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                      >
-                        Reinstate
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setEditing(v)}
-                      className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                ),
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400">View only</span>
+                  ),
               },
             ]}
             rows={vendors}

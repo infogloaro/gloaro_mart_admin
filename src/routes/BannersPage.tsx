@@ -1,11 +1,30 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { api, ApiError } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
-import type { Banner } from '../lib/types';
+import type { Banner, BannerPlacement } from '../lib/types';
 
-const RECOMMENDED_WIDTH = 1200;
-const RECOMMENDED_HEIGHT = 480;
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
+
+/**
+ * The home carousel is wide; the three section cards above it are small and
+ * near-square, so each placement advertises its own recommended size.
+ */
+const PLACEMENTS: {
+  value: BannerPlacement;
+  label: string;
+  hint: string;
+  width: number;
+  height: number;
+}[] = [
+  { value: 'home', label: 'Home carousel', hint: 'The scrolling banner under the section cards', width: 1200, height: 480 },
+  { value: 'card_shop', label: 'Shop card', hint: 'Background of the Shop card', width: 600, height: 400 },
+  { value: 'card_b2b', label: 'B2B card', hint: 'Background of the B2B card', width: 600, height: 400 },
+  { value: 'card_nearme', label: 'Near Me card', hint: 'Background of the Near Me card', width: 600, height: 400 },
+];
+
+function placementOf(value: BannerPlacement) {
+  return PLACEMENTS.find((p) => p.value === value) ?? PLACEMENTS[0];
+}
 
 function readImage(file: File): Promise<{ dataUrl: string; width: number; height: number }> {
   return new Promise((resolve, reject) => {
@@ -27,6 +46,8 @@ export default function BannersPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showForm, setShowForm] = useState(false);
+  const [placement, setPlacement] = useState<BannerPlacement>('home');
+  const [filter, setFilter] = useState<BannerPlacement | 'all'>('all');
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
@@ -54,6 +75,7 @@ export default function BannersPage() {
   }
 
   function resetForm() {
+    setPlacement('home');
     setTitle('');
     setSubtitle('');
     setLinkUrl('');
@@ -77,7 +99,8 @@ export default function BannersPage() {
         subtitle: subtitle.trim() || null,
         linkUrl: linkUrl.trim() || null,
         imageData: imageDataUrl,
-        sortOrder: banners?.length ?? 0,
+        placement,
+        sortOrder: banners?.filter((b) => b.placement === placement).length ?? 0,
       });
       resetForm();
       setShowForm(false);
@@ -109,14 +132,15 @@ export default function BannersPage() {
     }
   }
 
+  const spec = placementOf(placement);
   const dimsMismatch =
-    imageDims &&
-    (imageDims.width !== RECOMMENDED_WIDTH || imageDims.height !== RECOMMENDED_HEIGHT);
+    imageDims && (imageDims.width !== spec.width || imageDims.height !== spec.height);
+  const visible = banners?.filter((b) => filter === 'all' || b.placement === filter);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-extrabold tracking-tight text-ink">Home Banners</h1>
+        <h1 className="text-xl font-extrabold tracking-tight text-ink">Banners</h1>
         <button
           onClick={() => {
             setShowForm((s) => !s);
@@ -131,10 +155,31 @@ export default function BannersPage() {
       {showForm && (
         <form onSubmit={handleSubmit} className="space-y-3 card p-4">
           <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Where does it go?</label>
+            <div className="mb-1 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {PLACEMENTS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => setPlacement(p.value)}
+                  className={`rounded-xl border px-3 py-2 text-left text-sm font-semibold transition ${
+                    placement === p.value
+                      ? 'border-brand-navy bg-brand-navy text-white'
+                      : 'border-slate-200 bg-slate-50/60 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500">{spec.hint}</p>
+          </div>
+
+          <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Banner Image</label>
             <p className="mb-2 text-xs text-slate-500">
-              Recommended size: <span className="font-semibold">{RECOMMENDED_WIDTH} × {RECOMMENDED_HEIGHT}px</span>{' '}
-              ({(RECOMMENDED_WIDTH / RECOMMENDED_HEIGHT).toFixed(2)}:1 ratio) · JPG or PNG · Max 2MB
+              Recommended size: <span className="font-semibold">{spec.width} × {spec.height}px</span>{' '}
+              ({(spec.width / spec.height).toFixed(2)}:1 ratio) · JPG or PNG · Max 2MB
             </p>
             <input
               ref={fileInputRef}
@@ -157,6 +202,13 @@ export default function BannersPage() {
               />
             )}
           </div>
+
+          {placement !== 'home' && (
+            <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-800">
+              Section cards keep their own labels ({spec.label.replace(' card', '')} and its subtitle), so the
+              title and subtitle below are ignored for this placement — only the image is used.
+            </p>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -202,15 +254,46 @@ export default function BannersPage() {
       {actionError && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">{actionError}</div>}
       {loading && <div className="p-8 text-center text-sm font-medium text-slate-400">Loading…</div>}
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">{error}</div>}
-      {!loading && !error && banners && (
+      {!loading && !error && banners && banners.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {(['all', ...PLACEMENTS.map((p) => p.value)] as const).map((value) => {
+            const count =
+              value === 'all' ? banners.length : banners.filter((b) => b.placement === value).length;
+            return (
+              <button
+                key={value}
+                onClick={() => setFilter(value)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                  filter === value
+                    ? 'bg-brand-navy text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {value === 'all' ? 'All' : placementOf(value).label} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {!loading && !error && visible && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {banners.length === 0 && <p className="text-sm text-slate-500">No banners uploaded yet.</p>}
-          {banners.map((b) => (
+          {visible.length === 0 && (
+            <p className="text-sm text-slate-500">
+              {banners && banners.length > 0
+                ? 'No banners for this placement yet.'
+                : 'No banners uploaded yet.'}
+            </p>
+          )}
+          {visible.map((b) => (
             <div key={b.id} className="overflow-hidden card">
               <img src={b.image_data} alt={b.title ?? 'Banner'} className="h-32 w-full object-cover" />
               <div className="p-4">
                 <div className="flex items-start justify-between">
                   <div>
+                    <div className="mb-1 inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                      {placementOf(b.placement).label}
+                    </div>
                     {b.title && <div className="text-sm font-bold text-brand-navy">{b.title}</div>}
                     {b.subtitle && <div className="text-xs text-slate-500">{b.subtitle}</div>}
                   </div>

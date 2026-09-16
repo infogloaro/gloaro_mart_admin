@@ -8,6 +8,7 @@ import { FilterTabs } from '../components/ui/FilterTabs';
 import { Pagination } from '../components/ui/Pagination';
 import { Modal } from '../components/ui/Modal';
 import { Icon } from '../components/ui/Icon';
+import { useCan } from '../lib/staffContext';
 import type { AdminPayment, AdminPaymentDetail, Paged } from '../lib/types';
 
 const FILTERS = ['all', 'pending', 'successful', 'partially_refunded', 'refunded', 'failed', 'cancelled'] as const;
@@ -170,6 +171,7 @@ function PaymentDetailModal({
   onClose: () => void;
   onRefunded: () => void;
 }) {
+  const can = useCan('payments');
   const { data: payment, loading, error, reload } = useApiData<AdminPaymentDetail>(
     `/api/admin/payments/${paymentId}`,
     [paymentId]
@@ -311,32 +313,36 @@ function PaymentDetailModal({
             )}
 
             {refundable > 0 ? (
-              <form onSubmit={submitRefund} className="flex flex-wrap items-end gap-2">
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium text-slate-600">
-                    Amount (₹) — up to {money(refundable)}
-                  </label>
-                  <input
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    className="w-32 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm"
-                  />
-                </div>
-                <div className="min-w-[180px] flex-1">
-                  <label className="mb-1 block text-[11px] font-medium text-slate-600">Reason</label>
-                  <input
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    placeholder="Why is this being refunded?"
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm"
-                  />
-                </div>
-                <button type="submit" disabled={submitting} className="btn-primary px-4 py-2 text-sm">
-                  {submitting ? 'Raising…' : 'Raise refund'}
-                </button>
-              </form>
+              can.edit ? (
+                <form onSubmit={submitRefund} className="flex flex-wrap items-end gap-2">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-slate-600">
+                      Amount (₹) — up to {money(refundable)}
+                    </label>
+                    <input
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      className="w-32 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="min-w-[180px] flex-1">
+                    <label className="mb-1 block text-[11px] font-medium text-slate-600">Reason</label>
+                    <input
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="Why is this being refunded?"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <button type="submit" disabled={submitting} className="btn-primary px-4 py-2 text-sm">
+                    {submitting ? 'Raising…' : 'Raise refund'}
+                  </button>
+                </form>
+              ) : (
+                <p className="text-xs font-medium text-slate-400">View only — your role cannot raise refunds.</p>
+              )
             ) : (
               <p className="text-xs font-medium text-slate-400">
                 {payment.amountCapturedCents === 0

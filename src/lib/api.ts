@@ -62,7 +62,13 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
 
   if (res.ok) return data as T;
 
-  if (res.status === 401 || res.status === 403) {
+  // Only 401 means "we do not know who you are" — the session is genuinely
+  // over, so it is thrown away and the operator signs in again. A 403 is the
+  // opposite: we know exactly who they are and this one module is not theirs.
+  // Treating it as a dead session logged a scoped admin straight back out of
+  // the panel the moment they touched a page their role does not cover, which
+  // read as an endless redirect to the login screen.
+  if (res.status === 401) {
     clearToken();
     if (window.location.pathname !== '/login') {
       window.location.assign('/login');

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { clearToken } from '../../lib/auth';
 import { NAV_GROUPS, type NavGroup, type NavItem } from '../../lib/navigation';
+import { canView, useStaffMe } from '../../lib/staffContext';
 import { Icon } from '../ui/Icon';
 import { Logo } from '../ui/Logo';
 
@@ -136,6 +137,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) {
   const { pathname } = useLocation();
   const [query, setQuery] = useState('');
+  const me = useStaffMe();
 
   // The drawer sits over the page, so Escape has to be able to dismiss it.
   useEffect(() => {
@@ -147,18 +149,31 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
     return () => window.removeEventListener('keydown', onKey);
   }, [mobileOpen, onCloseMobile]);
 
+  // Modules the signed-in admin's role does not grant stay off the rail
+  // entirely — a menu that leads to a 403 from every page it opens just
+  // teaches the operator to distrust the sidebar.
+  const permitted = useMemo(
+    () =>
+      NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => canView(me, i.permission)) })).filter(
+        (g) => g.items.length > 0
+      ),
+    [me]
+  );
+
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return NAV_GROUPS;
-    return NAV_GROUPS.map((g) => ({
-      ...g,
-      items: g.items.filter((i) => i.label.toLowerCase().includes(q)),
-    })).filter((g) => g.items.length > 0);
-  }, [query]);
+    if (!q) return permitted;
+    return permitted
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((i) => i.label.toLowerCase().includes(q)),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, [permitted, query]);
 
-  const liveCount = NAV_GROUPS.flatMap((g) => g.items).filter((i) => i.status === 'live').length;
-  const totalCount = NAV_GROUPS.flatMap((g) => g.items).length;
-  const livePercent = Math.round((liveCount / totalCount) * 100);
+  const liveCount = permitted.flatMap((g) => g.items).filter((i) => i.status === 'live').length;
+  const totalCount = permitted.flatMap((g) => g.items).length;
+  const livePercent = totalCount === 0 ? 0 : Math.round((liveCount / totalCount) * 100);
 
   function handleLogout() {
     clearToken();
