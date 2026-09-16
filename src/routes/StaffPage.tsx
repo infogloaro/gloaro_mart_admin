@@ -64,6 +64,7 @@ export default function StaffPage() {
   const [editingRole, setEditingRole] = useState<StaffRole | null>(null);
   const [creatingRole, setCreatingRole] = useState(false);
   const [revoking, setRevoking] = useState<StaffMember | null>(null);
+  const [resettingPassword, setResettingPassword] = useState<StaffMember | null>(null);
   const [deletingRole, setDeletingRole] = useState<StaffRole | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -217,16 +218,24 @@ export default function StaffPage() {
                 className: 'text-right',
                 render: (s) =>
                   me?.userId === s.id ? (
-                    // The server refuses this anyway; not offering it avoids
-                    // teaching the operator that it might work.
+                    // The server refuses a self-revoke anyway; not offering it
+                    // avoids teaching the operator that it might work.
                     <span className="text-xs text-slate-400">—</span>
                   ) : (
-                    <button
-                      onClick={() => setRevoking(s)}
-                      className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100"
-                    >
-                      Revoke access
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setResettingPassword(s)}
+                        className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-emerald hover:bg-mint-mist hover:text-emerald-deep"
+                      >
+                        Reset password
+                      </button>
+                      <button
+                        onClick={() => setRevoking(s)}
+                        className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100"
+                      >
+                        Revoke access
+                      </button>
+                    </div>
                   ),
               },
             ]}
@@ -338,6 +347,14 @@ export default function StaffPage() {
         />
       )}
 
+      {resettingPassword && (
+        <ResetPasswordDialog
+          member={resettingPassword}
+          onClose={() => setResettingPassword(null)}
+          onSaved={() => setResettingPassword(null)}
+        />
+      )}
+
       {deletingRole && (
         <ConfirmDialog
           title="Delete role"
@@ -350,6 +367,70 @@ export default function StaffPage() {
         />
       )}
     </div>
+  );
+}
+
+/** Sets a new password for a staff member and signs them out everywhere. */
+function ResetPasswordDialog({
+  member,
+  onClose,
+  onSaved,
+}: {
+  member: StaffMember;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    if (password.length < 8) {
+      setError('At least 8 characters.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await api.patch(`/api/admin/staff/${member.id}/password`, { password });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not reset the password.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title={`Reset password for ${member.full_name}`} onClose={onClose}>
+      <form onSubmit={save} className="space-y-3">
+        <p className="text-sm text-slate-500">
+          Whatever they were signed in with stops working the moment you save this — every device, immediately, not
+          just their next login.
+        </p>
+        <label className="block">
+          <span className={labelClass}>New password</span>
+          <input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            type="password"
+            autoFocus
+            placeholder="At least 8 characters"
+            className={inputClass}
+          />
+        </label>
+        {error && <p className="text-sm font-medium text-rose-700">{error}</p>}
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600">
+            Cancel
+          </button>
+          <button type="submit" disabled={busy} className="btn-primary px-4 py-2.5 text-sm">
+            {busy ? 'Saving…' : 'Reset password'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
