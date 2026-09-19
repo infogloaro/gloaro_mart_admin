@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
 import { Icon } from '../components/ui/Icon';
+import { clearToken } from '../lib/auth';
 import type { PlatformSettings } from '../lib/types';
 
 /** Form state is all strings — inputs give strings, and the API takes nulls for blanks. */
@@ -114,6 +116,136 @@ function Field({
   );
 }
 
+/**
+ * Self-service password change, gated by an OTP mailed to infogloaro@gmail.com —
+ * the change only takes effect once that code comes back. A confirmed change
+ * ends every session, this one included, so it logs the admin out.
+ */
+function ChangePasswordSection() {
+  const navigate = useNavigate();
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpRequested, setOtpRequested] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function handleRequestOtp(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+
+    if (newPassword.length < 8) return setError('New password must be at least 8 characters.');
+    if (newPassword !== confirmPassword) return setError('New password and confirmation do not match.');
+
+    setSaving(true);
+    try {
+      const res = await api.post<{ message: string }>('/api/admin/me/password/otp', {
+        currentPassword,
+        newPassword,
+      });
+      setOtpRequested(true);
+      setNotice(res.message);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not start the password change.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleConfirmOtp(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!otp.trim()) return setError('Enter the OTP.');
+
+    setSaving(true);
+    try {
+      await api.post('/api/admin/me/password/otp/confirm', { otp: otp.trim() });
+      // Held on screen briefly: the redirect is instant otherwise, and the
+      // operator never sees that the change actually succeeded.
+      setNotice('Password changed. Signing you out…');
+      setTimeout(() => {
+        clearToken();
+        navigate('/login', { replace: true });
+      }, 1800);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not confirm the OTP.');
+      setSaving(false);
+    }
+  }
+
+  if (otpRequested) {
+    return (
+      <Section title="My account" hint="Enter the OTP sent to infogloaro@gmail.com to finish changing your password.">
+        <form onSubmit={handleConfirmOtp} className="grid gap-3 sm:grid-cols-3">
+          <Field label="OTP" value={otp} onChange={setOtp} placeholder="123456" />
+          {notice && (
+            <div className="sm:col-span-3 rounded-xl border border-mint-soft bg-mint-mist px-4 py-2.5 text-sm font-medium text-emerald-deep">
+              {notice}
+            </div>
+          )}
+          {error && (
+            <div className="sm:col-span-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">
+              {error}
+            </div>
+          )}
+          <div className="sm:col-span-3 flex gap-2">
+            <button type="submit" disabled={saving} className="btn-primary px-5 py-2 text-sm">
+              {saving ? 'Confirming…' : 'Confirm and change password'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOtpRequested(false);
+                setOtp('');
+                setError(null);
+                setNotice(null);
+              }}
+              className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+            >
+              Start over
+            </button>
+          </div>
+        </form>
+      </Section>
+    );
+  }
+
+  return (
+    <Section title="My account" hint="An OTP is mailed to infogloaro@gmail.com before the change takes effect.">
+      <form onSubmit={handleRequestOtp} className="grid gap-3 sm:grid-cols-3">
+        <Field
+          label="Current password"
+          type="password"
+          value={currentPassword}
+          onChange={setCurrentPassword}
+          placeholder="••••••••"
+        />
+        <Field label="New password" type="password" value={newPassword} onChange={setNewPassword} placeholder="••••••••" />
+        <Field
+          label="Confirm new password"
+          type="password"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+          placeholder="••••••••"
+        />
+        {error && (
+          <div className="sm:col-span-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">
+            {error}
+          </div>
+        )}
+        <div className="sm:col-span-3">
+          <button type="submit" disabled={saving} className="btn-primary px-5 py-2 text-sm">
+            {saving ? 'Sending OTP…' : 'Send OTP'}
+          </button>
+        </div>
+      </form>
+    </Section>
+  );
+}
+
 export default function SettingsPage() {
   const { data: settings, loading, error, reload } = useApiData<PlatformSettings>('/api/admin/settings');
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -173,7 +305,10 @@ export default function SettingsPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-4xl space-y-4 pb-24">
+    // The account card sits outside the settings form, not inside it: its own
+    // <form> nested in this one is invalid HTML, and the browser drops the
+    // inner submit handler, so "Send OTP" posted the page instead of firing.
+    <div className="max-w-4xl space-y-4 pb-24">
       <div>
         <h1 className="text-xl font-extrabold tracking-tight text-ink">General Settings</h1>
         <p className="mt-0.5 text-sm text-slate-500">
@@ -182,6 +317,9 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      <ChangePasswordSection />
+
+      <form onSubmit={handleSubmit} className="space-y-4">
       <Section title="Brand" hint="Shown on the app home, invoices and support screens.">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Platform name" value={draft.platformName} onChange={set('platformName')} placeholder="Gloaro Mart" />
@@ -329,7 +467,8 @@ export default function SettingsPage() {
           </button>
         </div>
       </div>
-    </form>
+      </form>
+    </div>
   );
 }
 
