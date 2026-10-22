@@ -432,6 +432,13 @@ function CreditNoteModal({
               <span>Tax reversed</span>
               <span className="tabular-nums">{rupees(data.cgstCents + data.sgstCents + data.igstCents)}</span>
             </div>
+            {/* The order's discount came off after tax, so the share of it on these lines isn't paid back. */}
+            {data.discountCents > 0 && (
+              <div className="flex justify-between text-slate-600">
+                <span>Less discount given</span>
+                <span className="tabular-nums">−{rupees(data.discountCents)}</span>
+              </div>
+            )}
             <div className="flex justify-between border-t border-slate-200 pt-1.5 text-base font-extrabold text-ink">
               <span>Total credited</span>
               <span className="tabular-nums">{rupees(data.totalCents)}</span>
@@ -521,7 +528,9 @@ function RaiseCreditNote({
         const share = qty / l.quantity;
         const taxable = Math.round(l.taxableCents * share);
         const tax = Math.round((l.cgstCents + l.sgstCents + l.igstCents) * share);
-        return { taxable: acc.taxable + taxable, tax: acc.tax + tax, total: acc.total + taxable + tax };
+        // The order discount was taken off after tax, so its share isn't paid back.
+        const discount = Math.round(l.discountCents * share);
+        return { taxable: acc.taxable + taxable, tax: acc.tax + tax, total: acc.total + taxable + tax - discount };
       },
       { taxable: 0, tax: 0, total: 0 },
     );

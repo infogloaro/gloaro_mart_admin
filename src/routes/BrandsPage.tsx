@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, assetUrl } from '../lib/api';
+import { ImageUpload } from '../components/ui/ImageUpload';
 import { useApiData } from '../lib/useApiData';
 import { DataTable } from '../components/ui/DataTable';
 import { Modal } from '../components/ui/Modal';
@@ -96,7 +97,7 @@ export default function BrandsPage() {
                   <div className="flex items-center gap-3">
                     {b.logo_url ? (
                       <img
-                        src={b.logo_url}
+                        src={assetUrl(b.logo_url)}
                         alt=""
                         className="h-9 w-9 rounded-lg border border-slate-200 bg-white object-contain"
                         onError={(e) => {
@@ -296,25 +297,16 @@ function BrandFormModal({
             : 'Leave the slug blank to generate it from the name.'}
         </p>
 
-        <div className="grid grid-cols-[1fr_7rem] gap-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Logo URL</label>
-            <input
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              placeholder="https://…"
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Sort order</label>
-            <input
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
-              inputMode="numeric"
-              className={inputClass}
-            />
-          </div>
+        <ImageUpload label="Logo" area="brands" value={logoUrl} onChange={setLogoUrl} small />
+
+        <div className="w-28">
+          <label className="mb-1 block text-sm font-medium text-slate-700">Sort order</label>
+          <input
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            inputMode="numeric"
+            className={inputClass}
+          />
         </div>
 
         <div>

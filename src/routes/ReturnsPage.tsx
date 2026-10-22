@@ -262,6 +262,9 @@ export default function ReturnsPage() {
                   <span>
                     <span className="block text-xs font-semibold text-slate-600">{REASON_LABEL[r.reason]}</span>
                     <span className="block text-[11px] text-slate-400">
+                      {r.resolution === 'replacement' && (
+                        <span className="font-semibold text-emerald-deep">wants a replacement · </span>
+                      )}
                       {r.itemCount} item{r.itemCount === 1 ? '' : 's'}
                       {r.evidenceCount > 0 && ` · ${r.evidenceCount} photo${r.evidenceCount === 1 ? '' : 's'}`}
                     </span>
@@ -380,6 +383,11 @@ function ReturnModal({
   function submitApprove(e: FormEvent) {
     e.preventDefault();
     if (!data) return;
+    // A replacement sends the goods again rather than money back.
+    if (data.resolution === 'replacement') {
+      run('approve', { refundCents: 0, note: note.trim() || null }, 'Could not approve the return.');
+      return;
+    }
     const rupeesValue = Number(amount);
     if (!Number.isFinite(rupeesValue) || rupeesValue <= 0) {
       onError('Enter the amount to authorise.');
@@ -431,6 +439,9 @@ function ReturnModal({
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={data.status} />
             <span className="text-sm font-semibold text-ink">{REASON_LABEL[data.reason]}</span>
+            {data.resolution === 'replacement' && (
+              <span className="rounded bg-mint-mist px-2 py-0.5 text-[10px] font-bold text-emerald-deep">WANTS A REPLACEMENT</span>
+            )}
             {!data.isWithinWindow && (
               <span className="rounded bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
                 OUTSIDE THE RETURN WINDOW
@@ -544,6 +555,12 @@ function ReturnModal({
 
           {pending === 'approve' && (
             <form onSubmit={submitApprove} className="space-y-2.5 rounded-xl border border-emerald/30 bg-mint-mist/60 p-4">
+              {data.resolution === 'replacement' ? (
+                <p className="text-sm text-slate-600">
+                  Approving schedules the pickup and raises a replacement on the Replacements page. No refund is
+                  authorised unless the replacement is cancelled.
+                </p>
+              ) : (
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">
                   Refund to authorise (₹)
@@ -560,6 +577,7 @@ function ReturnModal({
                   Up to {rupees(data.refundableCents)}. Lower it to deduct shipping or damage.
                 </span>
               </label>
+              )}
               <input
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
@@ -687,7 +705,10 @@ function ReturnModal({
                   Record inspection
                 </button>
               )}
-              {data.status === 'received' && (
+              {data.status === 'received' && data.resolution === 'replacement' && (
+                <span className="text-[11px] text-slate-400">Received. The replacement continues on the Replacements page.</span>
+              )}
+              {data.status === 'received' && data.resolution !== 'replacement' && (
                 <button
                   onClick={() => run('refund', undefined, 'Could not release the refund.')}
                   disabled={busy || data.approvedRefundCents == null}

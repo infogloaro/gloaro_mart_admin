@@ -30,7 +30,13 @@ export function useStaffMe() {
 export function canView(me: StaffMe | null, permission: string | undefined): boolean {
   if (!permission) return true;
   if (!me) return false;
-  return me.isSuperAdmin || me.permissions.includes(permission);
+  if (me.isSuperAdmin) return true;
+  // 'platform_*.view' — any one of a family of dynamic keys will do.
+  if (permission.includes('*')) {
+    const [prefix, suffix] = permission.split('*');
+    return me.permissions.some((p) => p.startsWith(prefix) && p.endsWith(suffix));
+  }
+  return me.permissions.includes(permission);
 }
 
 /**

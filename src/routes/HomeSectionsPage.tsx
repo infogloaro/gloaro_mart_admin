@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, ApiError, isMissingEndpoint } from '../lib/api';
+import { api, ApiError, assetUrl, isMissingEndpoint } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
 import { useDebounced } from '../lib/useDebounced';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -236,7 +236,7 @@ export default function HomeSectionsPage() {
                         >
                           {item.imageUrl ? (
                             <img
-                              src={item.imageUrl}
+                              src={assetUrl(item.imageUrl)}
                               alt=""
                               className="h-12 w-16 rounded-lg border border-slate-200 object-cover"
                             />
@@ -539,7 +539,7 @@ function SectionModal({
                     </button>
                   </span>
                   {item.imageUrl && (
-                    <img src={item.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+                    <img src={assetUrl(item.imageUrl)} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
                   )}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-ink">{item.title}</span>
@@ -586,7 +586,7 @@ function SectionModal({
                       onClick={() => add(c)}
                       className="flex w-full items-center gap-2.5 rounded-lg border border-slate-200 px-3 py-1.5 text-left hover:border-emerald hover:bg-mint-mist"
                     >
-                      {c.imageUrl && <img src={c.imageUrl} alt="" className="h-7 w-7 rounded object-cover" />}
+                      {c.imageUrl && <img src={assetUrl(c.imageUrl)} alt="" className="h-7 w-7 rounded object-cover" />}
                       <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink">{c.title}</span>
                     </button>
                   ))}

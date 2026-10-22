@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Local secrets, the backend's own repo, and Claude settings
+.env
+Gloaro_mart_backend/
+.claude/

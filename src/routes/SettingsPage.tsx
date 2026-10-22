@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
 import { Icon } from '../components/ui/Icon';
+import { ImageUpload } from '../components/ui/ImageUpload';
 import { clearToken } from '../lib/auth';
 import type { PlatformSettings } from '../lib/types';
 
@@ -331,19 +332,21 @@ export default function SettingsPage() {
           />
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <div>
-            <Field label="Logo URL" value={draft.logoUrl} onChange={set('logoUrl')} placeholder="https://…/logo.png" />
-            <LogoPreview url={draft.logoUrl} label="Logo preview" />
-          </div>
-          <div>
-            <Field
-              label="Favicon URL"
-              value={draft.faviconUrl}
-              onChange={set('faviconUrl')}
-              placeholder="https://…/favicon.png"
-            />
-            <LogoPreview url={draft.faviconUrl} label="Favicon preview" small />
-          </div>
+          <ImageUpload
+            label="Logo"
+            area="settings"
+            value={draft.logoUrl}
+            onChange={set('logoUrl')}
+            placeholder="https://…/logo.png"
+          />
+          <ImageUpload
+            label="Favicon"
+            area="settings"
+            value={draft.faviconUrl}
+            onChange={set('faviconUrl')}
+            placeholder="https://…/favicon.png"
+            small
+          />
         </div>
       </Section>
 
@@ -468,25 +471,6 @@ export default function SettingsPage() {
         </div>
       </div>
       </form>
-    </div>
-  );
-}
-
-function LogoPreview({ url, label, small = false }: { url: string; label: string; small?: boolean }) {
-  const [broken, setBroken] = useState(false);
-  useEffect(() => setBroken(false), [url]);
-
-  const box = small ? 'h-9 w-9' : 'h-14 w-14';
-  return (
-    <div className="mt-2 flex items-center gap-2.5">
-      <div className={`${box} flex items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white`}>
-        {url && !broken ? (
-          <img src={url} alt="" className="h-full w-full object-contain" onError={() => setBroken(true)} />
-        ) : (
-          <Icon name="image" className="h-4 w-4 text-slate-300" />
-        )}
-      </div>
-      <span className="text-xs text-slate-500">{broken ? 'That URL did not load' : label}</span>
     </div>
   );
 }

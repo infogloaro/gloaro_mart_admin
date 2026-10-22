@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, assetUrl } from '../lib/api';
+import { ImageUpload } from '../components/ui/ImageUpload';
 import { useApiData } from '../lib/useApiData';
 import { useDebounced } from '../lib/useDebounced';
 import { DataTable } from '../components/ui/DataTable';
@@ -197,7 +198,7 @@ export default function ProductsPage() {
                   <div className="flex items-center gap-3">
                     {p.image_url ? (
                       <img
-                        src={p.image_url}
+                        src={assetUrl(p.image_url)}
                         alt=""
                         className="h-9 w-9 shrink-0 rounded-md border border-slate-200 object-cover"
                         onError={(e) => {
@@ -581,15 +582,7 @@ function ProductFormModal({
           </div>
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Image URL</label>
-          <input
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://…"
-            className={inputClass}
-          />
-        </div>
+        <ImageUpload label="Product image" area="products" value={imageUrl} onChange={setImageUrl} />
 
         <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />

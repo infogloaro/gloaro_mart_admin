@@ -6,6 +6,8 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 import { FilterTabs } from '../components/ui/FilterTabs';
 import { useCan } from '../lib/staffContext';
 import type { AdminVendor } from '../lib/types';
+import { VendorShopPageModal } from '../components/VendorShopPageModal';
+import { VendorTrustHoursModal } from '../components/VendorTrustHoursModal';
 
 const FILTERS = ['pending', 'approved', 'rejected', 'suspended', 'all'] as const;
 type Filter = (typeof FILTERS)[number];
@@ -18,6 +20,10 @@ export default function VendorsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [editing, setEditing] = useState<AdminVendor | null>(null);
+  // Description, logo, cover and photo gallery the customers see (SB1).
+  const [shopPage, setShopPage] = useState<AdminVendor | null>(null);
+  // The Verified badge hold (SB2) and opening hours (SB3).
+  const [trust, setTrust] = useState<AdminVendor | null>(null);
 
   const qs = filter === 'all' ? '' : `?status=${filter}`;
   const { data: vendors, loading, error, reload } = useApiData<AdminVendor[]>(`/api/admin/vendors${qs}`, [filter]);
@@ -77,7 +83,19 @@ export default function VendorsPage() {
                   </div>
                 ),
               },
-              { header: 'Status', render: (v) => <StatusBadge status={v.status} /> },
+              {
+                header: 'Status',
+                render: (v) => {
+                  const t = v as AdminVendor & { verified?: boolean; verification_hold?: boolean };
+                  return (
+                    <div className="space-y-1">
+                      <StatusBadge status={v.status} />
+                      {t.verified && <div className="text-xs font-semibold text-sky-700">✓ Verified</div>}
+                      {t.verification_hold && <div className="text-xs font-semibold text-amber-700">Badge on hold</div>}
+                    </div>
+                  );
+                },
+              },
               { header: 'Submitted', render: (v) => new Date(v.created_at).toLocaleDateString() },
               {
                 header: 'Actions',
@@ -126,9 +144,28 @@ export default function VendorsPage() {
                       >
                         Edit
                       </button>
+                      <button
+                        onClick={() => setShopPage(v)}
+                        className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200"
+                      >
+                        Shop page
+                      </button>
+                      <button
+                        onClick={() => setTrust(v)}
+                        className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200"
+                      >
+                        Trust &amp; hours
+                      </button>
                     </div>
                   ) : (
-                    <span className="text-xs text-slate-400">View only</span>
+                    <div className="flex flex-wrap gap-3">
+                      <button onClick={() => setShopPage(v)} className="text-xs font-medium text-slate-500 hover:underline">
+                        View shop page
+                      </button>
+                      <button onClick={() => setTrust(v)} className="text-xs font-medium text-slate-500 hover:underline">
+                        Trust &amp; hours
+                      </button>
+                    </div>
                   ),
               },
             ]}
@@ -141,6 +178,17 @@ export default function VendorsPage() {
 
       {editing && (
         <EditVendorModal vendor={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload(); }} />
+      )}
+      {shopPage && (
+        <VendorShopPageModal
+          vendor={shopPage}
+          canEdit={can.edit}
+          onClose={() => setShopPage(null)}
+          onSaved={() => { setShopPage(null); reload(); }}
+        />
+      )}
+      {trust && (
+        <VendorTrustHoursModal vendor={trust} canEdit={can.edit} onClose={() => setTrust(null)} onChanged={reload} />
       )}
     </div>
   );

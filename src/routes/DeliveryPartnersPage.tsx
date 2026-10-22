@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, ApiError, isMissingEndpoint } from '../lib/api';
+import { api, ApiError, assetUrl, isMissingEndpoint } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
 import { useDebounced } from '../lib/useDebounced';
 import { DataTable } from '../components/ui/DataTable';
@@ -9,12 +9,16 @@ import { Pagination } from '../components/ui/Pagination';
 import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { PendingApiNotice } from '../components/ui/PendingApiNotice';
+import { ImageUpload } from '../components/ui/ImageUpload';
+import { useCan } from '../lib/staffContext';
 import type {
   AdminDeliveryPartner,
   DeliveryPartnerDetail,
   DeliveryPartnerSummary,
   Paged,
   PartnerDocument,
+  PartnerDocumentType,
+  PartnerType,
 } from '../lib/types';
 
 const ENDPOINTS = [
@@ -76,7 +80,9 @@ export default function DeliveryPartnersPage() {
   const debounced = useDebounced(search, 300);
 
   const [openId, setOpenId] = useState<number | null>(null);
+  const [adding, setAdding] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const can = useCan('delivery_partners');
 
   const query = [
     filter === 'all' ? '' : `status=${filter}`,
@@ -103,12 +109,26 @@ export default function DeliveryPartnersPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-extrabold tracking-tight text-ink">Delivery Partners</h1>
-        <p className="text-sm text-slate-500">
-          Riders and courier agencies. Two things decide whether one can be given work: paperwork that is in date, and
-          capacity left today.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-extrabold tracking-tight text-ink">Delivery Partners</h1>
+          <p className="text-sm text-slate-500">
+            Riders and courier agencies. Two things decide whether one can be given work: paperwork that is in date,
+            and capacity left today.
+          </p>
+        </div>
+        {can.edit && (
+          <button
+            onClick={() => {
+              setAdding(true);
+              setActionError(null);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-deep"
+          >
+            <Icon name="bike" className="h-4 w-4" />
+            Add partner
+          </button>
+        )}
       </div>
 
       {actionError && (
@@ -320,13 +340,136 @@ export default function DeliveryPartnersPage() {
       {openId != null && (
         <PartnerModal id={openId} onClose={() => setOpenId(null)} onError={setActionError} onChanged={refresh} />
       )}
+
+      {adding && (
+        <AddPartnerModal
+          onClose={() => setAdding(false)}
+          onCreated={(id) => {
+            setAdding(false);
+            setFilter('pending');
+            refresh();
+            setOpenId(id);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/* --------------------------------------------------------------------- add */
+
+function AddPartnerModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: number) => void }) {
+  const [form, setForm] = useState({
+    name: '',
+    type: 'rider' as PartnerType,
+    phone: '',
+    email: '',
+    vehicleType: '',
+    vehicleNumber: '',
+    serviceAreas: '',
+    dailyCapacity: '20',
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const capacity = Number(form.dailyCapacity);
+    if (!form.name.trim() || !form.phone.trim()) return setError('Name and phone are required.');
+    if (!Number.isInteger(capacity) || capacity < 0) return setError('Capacity must be a whole number of deliveries.');
+    setBusy(true);
+    try {
+      const created = await api.post<DeliveryPartnerDetail>('/api/admin/delivery-partners', {
+        name: form.name.trim(),
+        type: form.type,
+        phone: form.phone.trim(),
+        email: form.email.trim() || null,
+        vehicleType: form.vehicleType.trim() || null,
+        vehicleNumber: form.vehicleNumber.trim() || null,
+        serviceAreas: form.serviceAreas.split(',').map((s) => s.trim()).filter(Boolean),
+        dailyCapacity: capacity,
+      });
+      onCreated(created.id);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not add the partner.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="Add a delivery partner" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <TextField label="Name" value={form.name} onChange={set('name')} />
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">Type</span>
+            <select value={form.type} onChange={set('type')} className={inputClass}>
+              <option value="rider">Rider</option>
+              <option value="agency">Courier agency</option>
+            </select>
+          </label>
+          <TextField label="Phone" value={form.phone} onChange={set('phone')} />
+          <TextField label="Email (optional)" value={form.email} onChange={set('email')} />
+          <TextField label="Vehicle" value={form.vehicleType} onChange={set('vehicleType')} placeholder="bike, van…" />
+          <TextField label="Vehicle number" value={form.vehicleNumber} onChange={set('vehicleNumber')} />
+        </div>
+        <TextField
+          label="Covers"
+          value={form.serviceAreas}
+          onChange={set('serviceAreas')}
+          placeholder="Pincodes or areas, comma separated"
+        />
+        <TextField label="Deliveries per day" value={form.dailyCapacity} onChange={set('dailyCapacity')} />
+        <p className="text-xs text-slate-400">
+          They start as waiting to be onboarded. Add their licence and ID proof, then onboard them.
+        </p>
+        {error && <p className="text-sm font-medium text-rose-700">{error}</p>}
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose} className="text-sm font-semibold text-slate-500">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={busy}
+            className="rounded-xl bg-emerald px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-deep disabled:opacity-50"
+          >
+            {busy ? 'Adding…' : 'Add partner'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function TextField({
+  label: name,
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
+}: {
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  type?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">{name}</span>
+      <input type={type} value={value} onChange={onChange} placeholder={placeholder} className={inputClass} />
+    </label>
   );
 }
 
 /* ------------------------------------------------------------------ detail */
 
-type Pending = 'reject' | 'suspend' | 'capacity' | null;
+type Pending = 'reject' | 'suspend' | 'capacity' | 'document' | 'cash' | null;
+
+const DOC_TYPES: PartnerDocumentType[] = ['licence', 'id_proof', 'rc', 'insurance', 'other'];
 
 function PartnerModal({
   id,
@@ -346,7 +489,31 @@ function PartnerModal({
   const [pending, setPending] = useState<Pending>(null);
   const [reason, setReason] = useState('');
   const [capacity, setCapacity] = useState('');
+  const [doc, setDoc] = useState({ type: 'licence' as PartnerDocumentType, fileUrl: '', expiresAt: '' });
+  const [cash, setCash] = useState({ amount: '', note: '' });
   const [busy, setBusy] = useState(false);
+  const can = useCan('delivery_partners');
+
+  function submitDocument(e: FormEvent) {
+    e.preventDefault();
+    if (!doc.fileUrl) {
+      onError('Upload the document first.');
+      return;
+    }
+    run('post', 'documents', { type: doc.type, fileUrl: doc.fileUrl, expiresAt: doc.expiresAt || null }, 'Could not add the document.');
+    setDoc({ type: 'licence', fileUrl: '', expiresAt: '' });
+  }
+
+  function submitCash(e: FormEvent) {
+    e.preventDefault();
+    const cents = Math.round(Number(cash.amount) * 100);
+    if (!Number.isFinite(cents) || cents <= 0) {
+      onError('Enter the amount handed over.');
+      return;
+    }
+    run('post', 'cod-handovers', { amountCents: cents, note: cash.note.trim() || null }, 'Could not record the handover.');
+    setCash({ amount: '', note: '' });
+  }
 
   async function run(method: 'post' | 'patch', path: string, body?: unknown, fallback?: string) {
     onError(null);
@@ -411,6 +578,16 @@ function PartnerModal({
                 {data.isOnline ? 'online' : 'offline'}
               </span>
             )}
+            {/* No rider app yet, so staff set who is on shift. Offline partners get no new work. */}
+            {data.status === 'active' && can.edit && (
+              <button
+                onClick={() => run('patch', '', { isOnline: !data.isOnline }, 'Could not change the shift.')}
+                disabled={busy}
+                className="text-xs font-semibold text-emerald-deep hover:underline disabled:opacity-50"
+              >
+                {data.isOnline ? 'Mark off shift' : 'Mark on shift'}
+              </button>
+            )}
           </div>
 
           {data.statusReason && (
@@ -441,6 +618,17 @@ function PartnerModal({
               value={rupees(data.codHeldCents)}
               hint={`last handed over ${formatDate(data.lastSettlementAt)}`}
               bad={data.codHeldCents > 0}
+              action={
+                data.codHeldCents > 0 && can.edit
+                  ? {
+                      label: 'Record handover',
+                      onClick: () => {
+                        setPending('cash');
+                        setCash({ amount: (data.codHeldCents / 100).toFixed(2), note: '' });
+                      },
+                    }
+                  : undefined
+              }
             />
           </div>
 
@@ -472,30 +660,35 @@ function PartnerModal({
           </div>
 
           <div>
-            <h3 className="text-[11px] font-bold tracking-wide text-slate-500 uppercase">Paperwork</h3>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-[11px] font-bold tracking-wide text-slate-500 uppercase">Paperwork</h3>
+              {can.edit && (
+                <button
+                  onClick={() => setPending('document')}
+                  className="text-xs font-semibold text-emerald-deep hover:underline"
+                >
+                  Add document
+                </button>
+              )}
+            </div>
             <div className="mt-2 space-y-1.5">
-              {data.documents.map((doc) => {
-                const state = docState(doc);
+              {data.documents.map((d) => {
+                const state = docState(d);
                 return (
-                  <a
-                    key={doc.id}
-                    href={doc.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={`flex items-center gap-3 rounded-xl border px-3.5 py-2.5 hover:border-emerald ${
+                  <div
+                    key={d.id}
+                    className={`flex items-center gap-3 rounded-xl border px-3.5 py-2.5 ${
                       state === 'expired' ? 'border-rose-200 bg-rose-50/60' : 'border-slate-200'
                     }`}
                   >
                     <Icon name="filetext" className="h-4 w-4 shrink-0 text-slate-400" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium text-ink capitalize">
-                        {doc.type.replace('_', ' ')}
-                      </span>
+                    <a href={assetUrl(d.fileUrl)} target="_blank" rel="noreferrer" className="min-w-0 flex-1 hover:underline">
+                      <span className="block text-sm font-medium text-ink capitalize">{d.type.replace('_', ' ')}</span>
                       <span className="block text-[11px] text-slate-400">
-                        uploaded {formatDate(doc.uploadedAt)}
-                        {doc.expiresAt && ` · expires ${formatDate(doc.expiresAt)}`}
+                        uploaded {formatDate(d.uploadedAt)}
+                        {d.expiresAt && ` · expires ${formatDate(d.expiresAt)}`}
                       </span>
-                    </span>
+                    </a>
                     {state !== 'ok' && (
                       <span
                         className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
@@ -505,8 +698,27 @@ function PartnerModal({
                         {state}
                       </span>
                     )}
-                    <span className="shrink-0 text-[10px] font-bold text-slate-400 uppercase">{doc.status}</span>
-                  </a>
+                    {d.status === 'pending' && can.edit ? (
+                      <span className="flex shrink-0 gap-1.5">
+                        <button
+                          onClick={() => run('patch', `documents/${d.id}`, { status: 'rejected' }, 'Could not reject it.')}
+                          disabled={busy}
+                          className="text-[11px] font-semibold text-rose-600 hover:underline"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          onClick={() => run('patch', `documents/${d.id}`, { status: 'approved' }, 'Could not approve it.')}
+                          disabled={busy}
+                          className="text-[11px] font-semibold text-emerald-deep hover:underline"
+                        >
+                          Approve
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-[10px] font-bold text-slate-400 uppercase">{d.status}</span>
+                    )}
+                  </div>
                 );
               })}
               {data.documents.length === 0 && (
@@ -606,6 +818,101 @@ function PartnerModal({
             </form>
           )}
 
+          {pending === 'document' && (
+            <form onSubmit={submitDocument} className="space-y-2.5 rounded-xl border border-slate-200 p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">Document</span>
+                  <select
+                    value={doc.type}
+                    onChange={(e) => setDoc((d) => ({ ...d, type: e.target.value as PartnerDocumentType }))}
+                    className={`${inputClass} capitalize`}
+                  >
+                    {DOC_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t.replace('_', ' ')}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">
+                    Expires (optional)
+                  </span>
+                  <input
+                    type="date"
+                    value={doc.expiresAt}
+                    onChange={(e) => setDoc((d) => ({ ...d, expiresAt: e.target.value }))}
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+              <ImageUpload
+                label="Photo or scan"
+                area="delivery-partners"
+                value={doc.fileUrl}
+                onChange={(fileUrl) => setDoc((d) => ({ ...d, fileUrl }))}
+                small
+              />
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setPending(null)} className="text-xs font-semibold text-slate-500">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="rounded-lg bg-emerald px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-deep disabled:opacity-50"
+                >
+                  {busy ? 'Saving…' : 'Add document'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {pending === 'cash' && (
+            <form onSubmit={submitCash} className="space-y-2.5 rounded-xl border border-gold/40 bg-gold/5 p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">
+                    Amount handed over (₹)
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={cash.amount}
+                    onChange={(e) => setCash((c) => ({ ...c, amount: e.target.value }))}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">
+                    Note (optional)
+                  </span>
+                  <input
+                    value={cash.note}
+                    onChange={(e) => setCash((c) => ({ ...c, note: e.target.value }))}
+                    placeholder="Deposit slip, UPI ref…"
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+              <p className="text-[11px] text-slate-500">They hold {rupees(data.codHeldCents)}. A handover can't be more.</p>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setPending(null)} className="text-xs font-semibold text-slate-500">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="rounded-lg bg-emerald px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-deep disabled:opacity-50"
+                >
+                  {busy ? 'Saving…' : 'Record handover'}
+                </button>
+              </div>
+            </form>
+          )}
+
           {pending === null && (
             <div className="space-y-2 border-t border-slate-100 pt-3">
               {/* The reasons are listed rather than left implicit — a disabled
@@ -670,12 +977,29 @@ function PartnerModal({
   );
 }
 
-function Metric({ label, value, hint, bad }: { label: string; value: string; hint?: string; bad?: boolean }) {
+function Metric({
+  label,
+  value,
+  hint,
+  bad,
+  action,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  bad?: boolean;
+  action?: { label: string; onClick: () => void };
+}) {
   return (
     <div className="rounded-xl border border-slate-200 px-3.5 py-2.5">
       <div className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">{label}</div>
       <div className={`text-sm font-bold tabular-nums ${bad ? 'text-state-error' : 'text-ink'}`}>{value}</div>
       {hint && <div className="text-[11px] text-slate-400">{hint}</div>}
+      {action && (
+        <button onClick={action.onClick} className="mt-1 text-xs font-semibold text-emerald-deep hover:underline">
+          {action.label}
+        </button>
+      )}
     </div>
   );
 }

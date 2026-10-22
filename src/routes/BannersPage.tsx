@@ -1,9 +1,9 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, assetUrl, uploadImage } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
 import type { Banner, BannerPlacement } from '../lib/types';
 
-const MAX_FILE_BYTES = 2 * 1024 * 1024;
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 /**
  * The home carousel is wide; the three section cards above it are small and
@@ -51,6 +51,8 @@ export default function BannersPage() {
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  // Local preview only; the saved banner points at the uploaded file.
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [imageDims, setImageDims] = useState<{ width: number; height: number } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -62,11 +64,12 @@ export default function BannersPage() {
     if (!file) return;
     setFormError(null);
     if (file.size > MAX_FILE_BYTES) {
-      setFormError(`Image is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max size is 2MB.`);
+      setFormError(`Image is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max size is 5MB.`);
       return;
     }
     try {
       const { dataUrl, width, height } = await readImage(file);
+      setImageFile(file);
       setImageDataUrl(dataUrl);
       setImageDims({ width, height });
     } catch {
@@ -79,6 +82,7 @@ export default function BannersPage() {
     setTitle('');
     setSubtitle('');
     setLinkUrl('');
+    setImageFile(null);
     setImageDataUrl(null);
     setImageDims(null);
     setFormError(null);
@@ -88,17 +92,18 @@ export default function BannersPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!imageDataUrl) {
+    if (!imageFile) {
       setFormError('Choose a banner image to upload.');
       return;
     }
     setSubmitting(true);
     try {
+      const imagePath = await uploadImage('banners', imageFile);
       await api.post('/api/admin/banners', {
         title: title.trim() || null,
         subtitle: subtitle.trim() || null,
         linkUrl: linkUrl.trim() || null,
-        imageData: imageDataUrl,
+        imageData: imagePath,
         placement,
         sortOrder: banners?.filter((b) => b.placement === placement).length ?? 0,
       });
@@ -179,7 +184,7 @@ export default function BannersPage() {
             <label className="mb-1 block text-sm font-medium text-slate-700">Banner Image</label>
             <p className="mb-2 text-xs text-slate-500">
               Recommended size: <span className="font-semibold">{spec.width} × {spec.height}px</span>{' '}
-              ({(spec.width / spec.height).toFixed(2)}:1 ratio) · JPG or PNG · Max 2MB
+              ({(spec.width / spec.height).toFixed(2)}:1 ratio) · JPG, PNG or WebP · Max 5MB
             </p>
             <input
               ref={fileInputRef}
@@ -287,7 +292,7 @@ export default function BannersPage() {
           )}
           {visible.map((b) => (
             <div key={b.id} className="overflow-hidden card">
-              <img src={b.image_data} alt={b.title ?? 'Banner'} className="h-32 w-full object-cover" />
+              <img src={assetUrl(b.image_data)} alt={b.title ?? 'Banner'} className="h-32 w-full object-cover" />
               <div className="p-4">
                 <div className="flex items-start justify-between">
                   <div>

@@ -8,7 +8,7 @@ import { FilterTabs } from '../components/ui/FilterTabs';
 import { Pagination } from '../components/ui/Pagination';
 import { Modal } from '../components/ui/Modal';
 import { useCan } from '../lib/staffContext';
-import type { AdminOrderDetail, AdminOrderListRow, OrderHistoryResponse, Paged } from '../lib/types';
+import type { AdminOrderDetail, AdminOrderListRow, OrderChannels, OrderHistoryResponse, Paged } from '../lib/types';
 
 const FILTERS = ['all', 'pending', 'confirmed', 'packed', 'out_for_delivery', 'delivered', 'cancelled'] as const;
 type Filter = (typeof FILTERS)[number];
@@ -41,10 +41,15 @@ export default function OrdersPage() {
   // Pinning a group narrows the list to the one purchase, however many shops it
   // was split across. Set by clicking a reference in the table.
   const [groupRef, setGroupRef] = useState('');
+  // A Platform Registry sales channel id, 'none' for unattributed, '' for all.
+  const [channel, setChannel] = useState('');
   const debouncedSearch = useDebounced(search);
+  // Built from the registry: any platform with the "orders" capability shows up here.
+  const channels = useApiData<OrderChannels>('/api/admin/orders/channels');
 
   const qs = new URLSearchParams({
     ...(filter === 'all' ? {} : { status: filter }),
+    ...(channel ? { channel } : {}),
     ...(debouncedSearch.trim() ? { q: debouncedSearch.trim() } : {}),
     ...(groupRef ? { groupRef } : {}),
     ...(from ? { from } : {}),
@@ -59,6 +64,7 @@ export default function OrdersPage() {
     groupRef,
     from,
     to,
+    channel,
   ]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
@@ -88,13 +94,14 @@ export default function OrdersPage() {
     setStatus(order, next);
   }
 
-  const hasFilters = Boolean(debouncedSearch.trim() || from || to || groupRef || filter !== 'all');
+  const hasFilters = Boolean(debouncedSearch.trim() || from || to || groupRef || channel || filter !== 'all');
 
   function clearFilters() {
     setSearch('');
     setFrom('');
     setTo('');
     setGroupRef('');
+    setChannel('');
     setFilter('all');
     setPage(1);
   }
@@ -147,6 +154,28 @@ export default function OrdersPage() {
             className="rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-sm"
           />
         </div>
+        {channels.data && channels.data.channels.length > 0 && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Channel</label>
+            <select
+              value={channel}
+              onChange={(e) => {
+                setChannel(e.target.value);
+                setPage(1);
+              }}
+              className="rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-sm"
+            >
+              <option value="">All channels</option>
+              {channels.data.channels.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.status !== 'active' ? ' (disabled)' : ''} · {c.order_count}
+                </option>
+              ))}
+              <option value="none">No channel · {channels.data.unattributedCount}</option>
+            </select>
+          </div>
+        )}
         {groupRef && (
           <button
             onClick={() => {
@@ -217,6 +246,19 @@ export default function OrdersPage() {
                     <span className="text-slate-400">—</span>
                   ),
               },
+              ...(channels.data && channels.data.channels.length > 0
+                ? [
+                    {
+                      header: 'Channel',
+                      render: (o: AdminOrderListRow) =>
+                        o.sales_channel_name ? (
+                          <span className="rounded-md bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700">{o.sales_channel_name}</span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        ),
+                    },
+                  ]
+                : []),
               {
                 header: 'Vendor',
                 render: (o) => (

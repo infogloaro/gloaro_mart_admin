@@ -414,6 +414,24 @@ function CampaignModal({
     }
   }
 
+  /** Add, mark agreed or remove a shop or category. */
+  async function participant(method: 'POST' | 'PATCH' | 'DELETE', participantId: number | null, body?: Record<string, unknown>) {
+    onError(null);
+    setBusy(true);
+    try {
+      const base = `/api/admin/campaigns/${id}/participants`;
+      if (method === 'POST') await api.post(base, body);
+      else if (method === 'PATCH') await api.patch(`${base}/${participantId}`, body);
+      else await api.delete(`${base}/${participantId}`);
+      reload();
+      onChanged();
+    } catch (err) {
+      onError(err instanceof ApiError ? err.message : 'Could not change who is taking part.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveEdits(e: FormEvent) {
     e.preventDefault();
     onError(null);
@@ -539,23 +557,43 @@ function CampaignModal({
                       {p.joinedAt && ` · joined ${formatDate(p.joinedAt)}`}
                     </span>
                   </span>
-                  {data.fundedBy !== 'platform' && (
-                    <span
+                  {data.fundedBy !== 'platform' && p.type === 'vendor' && (
+                    <button
+                      type="button"
+                      disabled={busy || data.status === 'ended'}
+                      onClick={() => participant('PATCH', p.id, { optedIn: !p.optedIn })}
+                      title={p.optedIn ? 'Record that this shop left' : 'Record that this shop agreed to fund it'}
                       className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
                         p.optedIn ? 'bg-state-success/12 text-state-success-ink' : 'bg-amber-100 text-amber-700'
                       }`}
                     >
-                      {p.optedIn ? 'in' : 'not yet'}
-                    </span>
+                      {p.optedIn ? 'in' : 'not yet · mark agreed'}
+                    </button>
+                  )}
+                  {data.status !== 'ended' && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => participant('DELETE', p.id)}
+                      aria-label={`Remove ${p.name}`}
+                      className="shrink-0 text-slate-400 hover:text-rose-600"
+                    >
+                      <Icon name="x" className="h-4 w-4" />
+                    </button>
                   )}
                 </div>
               ))}
               {data.participants.length === 0 && (
                 <p className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-400">
-                  Nothing is taking part — the campaign will not apply anywhere.
+                  {data.scope === 'platform' && data.fundedBy === 'platform'
+                    ? 'Nothing to add — it applies to every order in the marketplace.'
+                    : 'Nothing is taking part — the campaign will not apply anywhere.'}
                 </p>
               )}
             </div>
+            {data.status !== 'ended' && !(data.scope === 'platform' && data.fundedBy === 'platform') && (
+              <AddParticipant campaignId={id} scope={data.scope} disabled={busy} onAdd={(type, refId) => participant('POST', null, { type, refId })} />
+            )}
           </div>
 
           {editing ? (
@@ -625,10 +663,10 @@ function CampaignModal({
               {(data.status === 'paused' || data.status === 'scheduled' || data.status === 'draft') && (
                 <button
                   onClick={() => run('resume', 'Could not start the campaign.')}
-                  disabled={busy || data.participants.length === 0}
+                  disabled={busy}
                   className="rounded-lg bg-emerald px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-deep disabled:opacity-45"
                 >
-                  {data.participants.length === 0 ? 'Nothing is taking part' : 'Start it'}
+                  {data.status === 'paused' ? 'Resume' : 'Start it'}
                 </button>
               )}
               {data.status !== 'ended' && (
@@ -832,6 +870,70 @@ function CreateModal({
         </div>
       </form>
     </Modal>
+  );
+}
+
+/** Search shops (or, for a category campaign, categories) and add one. */
+function AddParticipant({
+  campaignId,
+  scope,
+  disabled,
+  onAdd,
+}: {
+  campaignId: number;
+  scope: CampaignScope;
+  disabled: boolean;
+  onAdd: (type: 'vendor' | 'category', refId: number) => void;
+}) {
+  const [type, setType] = useState<'vendor' | 'category'>(scope === 'category' ? 'category' : 'vendor');
+  const [search, setSearch] = useState('');
+  const debounced = useDebounced(search, 300);
+  const { data: found } = useApiData<{ type: string; refId: number; name: string; subtitle: string | null }[]>(
+    debounced ? `/api/admin/campaigns/${campaignId}/candidates?type=${type}&q=${encodeURIComponent(debounced)}` : '',
+    [campaignId, type, debounced],
+  );
+
+  return (
+    <div className="mt-2 space-y-1.5">
+      <div className="flex gap-2">
+        {scope === 'category' && (
+          <select value={type} onChange={(e) => setType(e.target.value as 'vendor' | 'category')} className="rounded-xl border border-slate-200 bg-slate-50/60 px-2.5 text-xs">
+            <option value="category">Category</option>
+            <option value="vendor">Shop</option>
+          </select>
+        )}
+        <div className="relative flex-1">
+          <Icon name="search" className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={type === 'category' ? 'Search a category to add…' : 'Search a shop to add…'}
+            disabled={disabled}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-2 pr-3 pl-8 text-xs"
+          />
+        </div>
+      </div>
+      {debounced && (
+        <div className="max-h-36 space-y-1 overflow-y-auto">
+          {(found ?? []).map((c) => (
+            <button
+              type="button"
+              key={`${c.type}-${c.refId}`}
+              disabled={disabled}
+              onClick={() => {
+                onAdd(type, c.refId);
+                setSearch('');
+              }}
+              className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-left hover:border-emerald hover:bg-mint-mist"
+            >
+              <span className="truncate text-xs font-medium text-ink">{c.name}</span>
+              {c.subtitle && <span className="shrink-0 text-[11px] text-slate-400">{c.subtitle}</span>}
+            </button>
+          ))}
+          {found?.length === 0 && <p className="px-1 py-2 text-xs text-slate-400">Nothing matches.</p>}
+        </div>
+      )}
+    </div>
   );
 }
 

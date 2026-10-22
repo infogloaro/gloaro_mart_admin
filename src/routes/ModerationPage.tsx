@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, ApiError, isMissingEndpoint } from '../lib/api';
+import { api, ApiError, assetUrl, isMissingEndpoint } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
 import { useDebounced } from '../lib/useDebounced';
 import { Icon } from '../components/ui/Icon';
@@ -211,7 +211,7 @@ export default function ModerationPage() {
             <div className="flex gap-3 p-4">
               {p.image_url ? (
                 <img
-                  src={p.image_url}
+                  src={assetUrl(p.image_url)}
                   alt=""
                   className="h-24 w-24 shrink-0 rounded-xl border border-slate-200 object-cover"
                 />

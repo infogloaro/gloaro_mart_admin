@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState, type FormEvent } from 'react';
-import { api, ApiError, isMissingEndpoint } from '../lib/api';
+import { api, ApiError, isMissingEndpoint, isPendingApproval } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
 import { DataTable } from '../components/ui/DataTable';
 import { FilterTabs } from '../components/ui/FilterTabs';
@@ -545,6 +545,7 @@ function RoleDialog({
   const [selected, setSelected] = useState<Set<string>>(() => new Set(role?.permissions ?? []));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [held, setHeld] = useState<string | null>(null);
 
   const locked = role?.is_system ?? false;
 
@@ -602,14 +603,19 @@ function RoleDialog({
     e.preventDefault();
     setBusy(true);
     setError(null);
+    setHeld(null);
     try {
       const body = {
         name: name.trim(),
         description: description.trim() || undefined,
         ...(locked ? {} : { permissions: [...selected] }),
       };
-      if (role) await api.patch(`/api/admin/roles/${role.id}`, body);
-      else await api.post('/api/admin/roles', body);
+      const r = role ? await api.patch(`/api/admin/roles/${role.id}`, body) : await api.post('/api/admin/roles', body);
+      // Held for a super admin: say so here rather than closing as if it were saved.
+      if (isPendingApproval(r)) {
+        setHeld(r.message);
+        return;
+      }
       onSaved();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not save the role.');
@@ -714,6 +720,7 @@ function RoleDialog({
           </div>
         )}
 
+        {held && <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">{held}</p>}
         {error && <p className="text-sm font-medium text-rose-700">{error}</p>}
 
         <div className="flex justify-end gap-2 pt-1">

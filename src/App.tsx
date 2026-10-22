@@ -51,8 +51,18 @@ import CampaignsPage from './routes/CampaignsPage';
 import AnalyticsPage from './routes/AnalyticsPage';
 import AdminLogsPage from './routes/AdminLogsPage';
 import FeatureFlagsPage from './routes/FeatureFlagsPage';
+import PlatformRegistryPage from './routes/PlatformRegistryPage';
+import ChannelsPage from './routes/ChannelsPage';
+import AdPricingPage from './routes/AdPricingPage';
+import AdCampaignsPage from './routes/AdCampaignsPage';
+import AdPaymentsPage from './routes/AdPaymentsPage';
+import AdDashboardPage from './routes/AdDashboardPage';
+import ApprovalsPage from './routes/ApprovalsPage';
 import NotificationsPage from './routes/NotificationsPage';
 import ComingSoonPage from './routes/ComingSoonPage';
+import ShopReportsPage from './routes/ShopReportsPage';
+import ShopOffersPage from './routes/ShopOffersPage';
+import AdTapReviewPage from './routes/AdTapReviewPage';
 
 export default function App() {
   return (
@@ -64,8 +74,10 @@ export default function App() {
             <Route path="/" element={<HomeRoute />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/vendors" element={<VendorsPage />} />
+            <Route path="/vendors/reports" element={<ShopReportsPage />} />
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/offers" element={<OffersPage />} />
+            <Route path="/offers/shops" element={<ShopOffersPage />} />
             <Route path="/banners" element={<BannersPage />} />
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
@@ -109,6 +121,14 @@ export default function App() {
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/audit-logs" element={<AdminLogsPage />} />
             <Route path="/feature-flags" element={<FeatureFlagsPage />} />
+            <Route path="/platform-registry" element={<PlatformRegistryPage />} />
+            <Route path="/channels" element={<ChannelsPage />} />
+            <Route path="/ads" element={<AdDashboardPage />} />
+            <Route path="/ads/pricing" element={<AdPricingPage />} />
+            <Route path="/ads/campaigns" element={<AdCampaignsPage />} />
+            <Route path="/ads/payments" element={<AdPaymentsPage />} />
+            <Route path="/ads/taps" element={<AdTapReviewPage />} />
+            <Route path="/approvals" element={<ApprovalsPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
 
             {/*

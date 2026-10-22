@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { api, ApiError, isMissingEndpoint } from '../lib/api';
+import { api, ApiError, assetUrl, isMissingEndpoint } from '../lib/api';
+import { ImageUpload } from '../components/ui/ImageUpload';
 import { useApiData } from '../lib/useApiData';
 import { useDebounced } from '../lib/useDebounced';
 import { DataTable } from '../components/ui/DataTable';
@@ -446,15 +447,9 @@ export default function VariantsPage() {
 
                 {can.edit && (
                   <form onSubmit={addMedia} className="mb-3 flex flex-wrap items-end gap-3">
-                    <label className="block min-w-56 flex-1">
-                      <span className={labelClass}>Image URL</span>
-                      <input
-                        value={mediaUrl}
-                        onChange={(e) => setMediaUrl(e.target.value)}
-                        placeholder="https://…"
-                        className={inputClass}
-                      />
-                    </label>
+                    <div className="min-w-72 flex-1">
+                      <ImageUpload label="Image" area="products" value={mediaUrl} onChange={setMediaUrl} small />
+                    </div>
                     <label className="block w-52">
                       <span className={labelClass}>Applies to</span>
                       <select
@@ -482,7 +477,7 @@ export default function VariantsPage() {
                   <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
                     {(media ?? []).map((m) => (
                       <div key={m.id} className="overflow-hidden rounded-xl border border-slate-200">
-                        <img src={m.url} alt={m.alt_text ?? ''} className="h-24 w-full object-cover" />
+                        <img src={assetUrl(m.url)} alt={m.alt_text ?? ''} className="h-24 w-full object-cover" />
                         <div className="flex items-center justify-between gap-1 px-2 py-1.5">
                           <span className="truncate text-[10px] font-semibold text-slate-500">
                             {m.is_primary ? 'Primary' : m.variant_id ? 'Variant' : 'Product'}

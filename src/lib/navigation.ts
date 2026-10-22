@@ -93,7 +93,12 @@ export const NAV_GROUPS: NavGroup[] = [
     id: "vendors",
     label: "Vendors",
     items: [
-      { to: "/vendors", label: "Vendors", icon: "store", status: "live", permission: "vendors.view" },
+      { to: "/vendors", label: "Vendors", icon: "store", status: "live", permission: "vendors.view", end: true },
+      {
+        to: "/vendors/reports",
+        label: "Shop Reports",
+        icon: "flag",
+        status: "live", permission: "vendors.view" },
       {
         to: "/vendor-kyc",
         label: "KYC & Documents",
@@ -237,6 +242,11 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/offers",
         label: "Offers & Coupons",
         icon: "percent",
+        status: "live", permission: "offers.view", end: true },
+      {
+        to: "/offers/shops",
+        label: "Shop Offers",
+        icon: "tag",
         status: "live", permission: "offers.view" },
       { to: "/banners", label: "Banners", icon: "image", status: "live", permission: "banners.view" },
       { to: "/menu", label: "App Menu", icon: "menu", status: "live", permission: "app_menu.view" },
@@ -250,6 +260,42 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Campaigns",
         icon: "megaphone",
         status: "live", permission: "campaigns.view" },
+      {
+        to: "/ads",
+        label: "Ad Promotions",
+        icon: "chart",
+        status: "live",
+        permission: "ad_promotions.view",
+        end: true,
+      },
+      {
+        to: "/ads/campaigns",
+        label: "Ad Campaigns",
+        icon: "image",
+        status: "live",
+        permission: "ad_promotions.view",
+      },
+      {
+        to: "/ads/payments",
+        label: "Ad Payments",
+        icon: "wallet",
+        status: "live",
+        permission: "ad_promotions.view",
+      },
+      {
+        to: "/ads/taps",
+        label: "Ad Tap Review",
+        icon: "alert",
+        status: "live",
+        permission: "ad_promotions.view",
+      },
+      {
+        to: "/ads/pricing",
+        label: "Ad Pricing",
+        icon: "coins",
+        status: "live",
+        permission: "ad_promotions.view",
+      },
       {
         // A personal inbox scoped to the signed-in account, like Settings'
         // profile tab — every admin sees their own regardless of role, so
@@ -298,10 +344,32 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: "feature_flags.view",
       },
       {
+        to: "/platform-registry",
+        label: "Platform Registry",
+        icon: "layers",
+        status: "live",
+        // One permission module per registry category; viewing any one opens the menu.
+        permission: "platform_*.view",
+      },
+      {
+        to: "/approvals",
+        label: "Approvals",
+        icon: "shield",
+        status: "live",
+        // Open to all staff: each sees their own requests; super admins see and decide all.
+      },
+      {
         to: "/settings",
         label: "General Settings",
         icon: "settings",
         status: "live", permission: "settings.view" },
+      {
+        to: "/channels",
+        label: "Channels",
+        icon: "chat",
+        status: "live",
+        permission: "channels.view",
+      },
     ],
   },
 ];

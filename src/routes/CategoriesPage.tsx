@@ -1,15 +1,19 @@
 import { useState, type FormEvent } from 'react';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, assetUrl } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
 import { DataTable } from '../components/ui/DataTable';
 import { Modal } from '../components/ui/Modal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { ImageUpload } from '../components/ui/ImageUpload';
 import { useCan } from '../lib/staffContext';
 import type { Category } from '../lib/types';
 
+// The keys the app knows. Each picks the icon and the built-in photo the app
+// shows when the category has no image of its own.
 const ICON_OPTIONS = [
-  'devices', 'fashion', 'grocery', 'home', 'beauty',
-  'electronics', 'sports', 'books', 'toys', 'food', 'health', 'other',
+  'grocery', 'fruits', 'food', 'fashion', 'beauty', 'home', 'devices', 'electronics',
+  'electrical', 'appliances', 'pharmacy', 'books', 'stationery', 'toys', 'baby',
+  'sports', 'hardware', 'pets', 'other',
 ];
 
 export default function CategoriesPage() {
@@ -98,6 +102,15 @@ export default function CategoriesPage() {
         <div className="overflow-hidden card">
           <DataTable
             columns={[
+              {
+                header: 'Image',
+                render: (c) =>
+                  c.image_url ? (
+                    <img src={assetUrl(c.image_url)} alt="" className="h-10 w-10 rounded-lg border border-slate-200 object-cover" />
+                  ) : (
+                    <span className="text-xs text-slate-400">Built-in</span>
+                  ),
+              },
               { header: 'Name', render: (c) => <span className="font-medium">{c.name}</span> },
               { header: 'Icon', render: (c) => c.icon_key },
               {
@@ -225,6 +238,7 @@ function CategoryFormModal({
   const isEdit = category !== null;
   const [name, setName] = useState(category?.name ?? '');
   const [iconKey, setIconKey] = useState(category?.icon_key ?? 'other');
+  const [imageUrl, setImageUrl] = useState(category?.image_url ?? '');
   const [sortOrder, setSortOrder] = useState(String(category?.sort_order ?? nextSortOrder));
   const [isActive, setIsActive] = useState(category ? category.is_active : true);
   const [error, setError] = useState<string | null>(null);
@@ -238,7 +252,7 @@ function CategoryFormModal({
     const order = Number(sortOrder);
     if (!Number.isInteger(order) || order < 0) return setError('Sort order must be a whole number of 0 or more.');
 
-    const body = { name: name.trim(), iconKey, sortOrder: order, isActive };
+    const body = { name: name.trim(), iconKey, imageUrl: imageUrl.trim() || null, sortOrder: order, isActive };
     setSubmitting(true);
     try {
       if (isEdit) {
@@ -287,6 +301,13 @@ function CategoryFormModal({
               className={inputClass}
             />
           </div>
+        </div>
+        <div>
+          <ImageUpload label="Image" area="categories" value={imageUrl} onChange={setImageUrl} small />
+          <p className="mt-1 text-xs text-slate-500">
+            Shown on the app's category tiles. A square photo works best. Leave empty to use the app's built-in photo for the
+            icon above.
+          </p>
         </div>
         <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />

@@ -292,7 +292,7 @@ export default function BusinessAccountsPage() {
 
 /* ------------------------------------------------------------------ detail */
 
-type Pending = 'reject' | 'suspend' | 'credit' | null;
+type Pending = 'reject' | 'suspend' | 'credit' | 'payment' | null;
 
 function AccountModal({
   id,
@@ -313,7 +313,23 @@ function AccountModal({
   const [reason, setReason] = useState('');
   const [limit, setLimit] = useState('');
   const [terms, setTerms] = useState('');
+  const [payment, setPayment] = useState({ amount: '', reference: '' });
   const [busy, setBusy] = useState(false);
+
+  function submitPayment(e: FormEvent) {
+    e.preventDefault();
+    const cents = Math.round(Number(payment.amount) * 100);
+    if (!Number.isFinite(cents) || cents <= 0) {
+      onError('Enter the amount received.');
+      return;
+    }
+    if (!payment.reference.trim()) {
+      onError('Enter the UTR or cheque number.');
+      return;
+    }
+    run('post', 'payments', { amountCents: cents, reference: payment.reference.trim() }, 'Could not record the payment.');
+    setPayment({ amount: '', reference: '' });
+  }
 
   async function run(method: 'post' | 'patch', path: string, body?: unknown, message?: string) {
     onError(null);
@@ -433,7 +449,30 @@ function AccountModal({
                     style={{ width: `${Math.max(2, used * 100)}%` }}
                   />
                 </div>
+                {data.overdueCents > 0 && (
+                  <p className="mt-2 text-xs font-semibold text-state-error">
+                    {rupees(data.overdueCents)} overdue — no new credit orders until it is paid.
+                  </p>
+                )}
               </>
+            )}
+            {/* What brings the drawn figure down: the business paying its bill. */}
+            {data.creditUsedCents > 0 && pending === null && (
+              <button
+                onClick={() => {
+                  setPending('payment');
+                  setPayment({ amount: (data.creditUsedCents / 100).toFixed(2), reference: '' });
+                }}
+                className="mt-2 text-xs font-semibold text-emerald-deep hover:underline"
+              >
+                Record a payment received
+              </button>
+            )}
+            {data.creditPayments.length > 0 && (
+              <p className="mt-1 text-[11px] text-slate-400">
+                Last paid {rupees(data.creditPayments[0].amountCents)} on {formatDate(data.creditPayments[0].receivedAt)} (
+                {data.creditPayments[0].reference})
+              </p>
             )}
           </div>
 
@@ -549,6 +588,50 @@ function AccountModal({
                   className="rounded-lg bg-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
                 >
                   {busy ? 'Saving…' : pending === 'reject' ? 'Refuse verification' : 'Suspend account'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {pending === 'payment' && (
+            <form onSubmit={submitPayment} className="space-y-2.5 rounded-xl border border-slate-200 p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">
+                    Amount received (₹)
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={payment.amount}
+                    onChange={(e) => setPayment((p) => ({ ...p, amount: e.target.value }))}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">
+                    Reference
+                  </span>
+                  <input
+                    value={payment.reference}
+                    onChange={(e) => setPayment((p) => ({ ...p, reference: e.target.value }))}
+                    placeholder="UTR or cheque number"
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+              <p className="text-[11px] text-slate-500">Applied to the oldest credit orders first. Can't be more than they owe.</p>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setPending(null)} className="text-xs font-semibold text-slate-500">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="rounded-lg bg-emerald px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-deep disabled:opacity-50"
+                >
+                  {busy ? 'Saving…' : 'Record payment'}
                 </button>
               </div>
             </form>

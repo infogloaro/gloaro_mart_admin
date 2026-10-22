@@ -355,7 +355,7 @@ export default function SettlementsPage() {
 
 /* ------------------------------------------------------------------ detail */
 
-type Pending = 'hold' | 'pay' | null;
+type Pending = 'hold' | 'pay' | 'bank' | null;
 
 function SettlementModal({
   id,
@@ -374,7 +374,26 @@ function SettlementModal({
   const [pending, setPending] = useState<Pending>(null);
   const [reason, setReason] = useState('');
   const [utr, setUtr] = useState('');
+  const [bank, setBank] = useState({ accountHolder: '', accountNumber: '', ifsc: '' });
   const [busy, setBusy] = useState(false);
+
+  async function submitBank(e: FormEvent) {
+    e.preventDefault();
+    if (!data) return;
+    onError(null);
+    setBusy(true);
+    try {
+      await api.put(`/api/admin/settlements/bank-accounts/${data.vendorId}`, bank);
+      setPending(null);
+      setBank({ accountHolder: '', accountNumber: '', ifsc: '' });
+      reload();
+      onChanged();
+    } catch (err) {
+      onError(err instanceof ApiError ? err.message : 'Could not save the bank account.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function run(path: string, body?: unknown, message?: string) {
     onError(null);
@@ -440,6 +459,15 @@ function SettlementModal({
               <div className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">Bank account</div>
               <div className="font-mono text-sm text-ink">{data.bankAccountMasked ?? 'Not on file'}</div>
               <div className="text-[11px] text-slate-400">{data.bankIfsc ?? '—'}</div>
+              {/* Vendors add their own from the app; staff can enter it for them. */}
+              {can.edit && !['approved', 'paid'].includes(data.status) && pending === null && (
+                <button
+                  onClick={() => setPending('bank')}
+                  className="mt-1 text-xs font-semibold text-emerald-deep hover:underline"
+                >
+                  {data.bankAccountMasked ? 'Change account' : 'Add bank account'}
+                </button>
+              )}
             </div>
             <div className="rounded-xl border border-slate-200 px-4 py-3">
               <div className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">Payout</div>
@@ -471,7 +499,8 @@ function SettlementModal({
                     {d.note && <span className="block text-[11px] text-slate-400">{d.note}</span>}
                   </span>
                 }
-                value={`−${rupees(d.amountCents)}`}
+                // A negative amount is a credit to the shop (a manual credit, an ad refund).
+                value={d.amountCents < 0 ? `+${rupees(-d.amountCents)}` : `−${rupees(d.amountCents)}`}
                 muted
               />
             ))}
@@ -540,6 +569,59 @@ function SettlementModal({
                   className="rounded-lg bg-amber-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
                 >
                   {busy ? 'Holding…' : 'Hold payout'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {pending === 'bank' && (
+            <form onSubmit={submitBank} className="space-y-2.5 rounded-xl border border-slate-200 p-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">
+                    Account holder
+                  </span>
+                  <input
+                    value={bank.accountHolder}
+                    onChange={(e) => setBank((b) => ({ ...b, accountHolder: e.target.value }))}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">
+                    Account number
+                  </span>
+                  <input
+                    value={bank.accountNumber}
+                    onChange={(e) => setBank((b) => ({ ...b, accountNumber: e.target.value }))}
+                    inputMode="numeric"
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">IFSC</span>
+                  <input
+                    value={bank.ifsc}
+                    onChange={(e) => setBank((b) => ({ ...b, ifsc: e.target.value.toUpperCase() }))}
+                    placeholder="ABCD0123456"
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                The payout goes to the account on file when it is approved. Check it against the shop's cancelled cheque or
+                bank letter.
+              </p>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setPending(null)} className="text-xs font-semibold text-slate-500">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="rounded-lg bg-emerald px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-deep disabled:opacity-50"
+                >
+                  {busy ? 'Saving…' : 'Save account'}
                 </button>
               </div>
             </form>

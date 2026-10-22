@@ -8,7 +8,14 @@ import { Modal } from '../components/ui/Modal';
 import { Pagination } from '../components/ui/Pagination';
 import { StatCard } from '../components/ui/StatCard';
 import { PendingApiNotice } from '../components/ui/PendingApiNotice';
-import type { AdminShipment, Paged, ShipmentDetail, ShipmentStatus, ShipmentSummary } from '../lib/types';
+import type {
+  AdminShipment,
+  Paged,
+  PartnerCandidate,
+  ShipmentDetail,
+  ShipmentStatus,
+  ShipmentSummary,
+} from '../lib/types';
 
 const ENDPOINTS = [
   'GET    /api/admin/shipments',
@@ -344,6 +351,25 @@ function ShipmentDrawer({
   onChanged: () => void;
 }) {
   const { data, loading, error, reload } = useApiData<ShipmentDetail>(`/api/admin/shipments/${id}`, [id]);
+  const { data: candidates, reload: reloadCandidates } = useApiData<PartnerCandidate[]>(
+    `/api/admin/shipments/${id}/partners`,
+    [id],
+  );
+
+  async function assign(partnerId: number | null) {
+    onError(null);
+    setBusy(true);
+    try {
+      await api.post(`/api/admin/shipments/${id}/assign`, { partnerId });
+      reload();
+      reloadCandidates();
+      onChanged();
+    } catch (err) {
+      onError(err instanceof ApiError ? err.message : 'Could not assign the partner.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const [status, setStatus] = useState<ShipmentStatus | ''>('');
   const [note, setNote] = useState('');
@@ -465,6 +491,36 @@ function ShipmentDrawer({
               </ol>
             )}
           </div>
+
+          {!closed && (
+            <div className="rounded-xl border border-slate-200 p-4">
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">
+                  Delivery partner
+                </span>
+                <select
+                  value={data.partnerId ?? ''}
+                  disabled={busy}
+                  onChange={(e) => assign(e.target.value === '' ? null : Number(e.target.value))}
+                  className={inputClass}
+                >
+                  <option value="">
+                    {data.partnerId == null && data.partnerName ? `${data.partnerName} (not a registered partner)` : 'Unassigned'}
+                  </option>
+                  {(candidates ?? []).map((p) => (
+                    <option key={p.id} value={p.id} disabled={!p.available && p.id !== data.partnerId}>
+                      {p.name} · {p.activeAssignments}/{p.dailyCapacity}
+                      {p.coversArea ? ' · covers this area' : ''}
+                      {!p.available && p.id !== data.partnerId ? ` — ${p.reason}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="mt-1.5 text-[11px] text-slate-400">
+                Only active partners on shift, with paperwork in date and capacity left, can be picked.
+              </p>
+            </div>
+          )}
 
           {closed ? (
             <p className="rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-400">

@@ -70,6 +70,7 @@ export interface Category {
   id: number;
   name: string;
   icon_key: string;
+  image_url: string | null;
   sort_order: number;
   is_active: boolean;
   created_at: string;
@@ -144,6 +145,15 @@ export interface AdminOrderListRow extends AdminOrder {
   checkout_group_reference: string | null;
   /** How many vendor orders that one checkout produced. */
   checkout_group_order_count: number;
+  /** The Platform Registry sales channel it came through; null when none was given. */
+  sales_channel_name: string | null;
+  sales_channel_slug: string | null;
+}
+
+/** Sales channels for the Orders filter: registry entries with the "orders" capability. */
+export interface OrderChannels {
+  channels: { id: number; slug: string; name: string; status: PlatformStatus; logo_url: string | null; order_count: number }[];
+  unattributedCount: number;
 }
 
 /** One entry in an order's status timeline. */
@@ -768,6 +778,8 @@ export interface MatchingConfig {
   /** Re-route on rejection without an admin approving it first. */
   autoReassign: boolean;
   maxReassignAttempts: number;
+  /** A replacement dearer than the original by more than this waits for the customer. */
+  reassignPriceTolerancePercent: number;
   updatedAt: string | null;
 }
 
@@ -805,6 +817,10 @@ export interface RoutingReassignment {
   orderId: number;
   orderReference: string;
   status: 'pending' | 'approved' | 'rejected' | 'auto';
+  /** Who a pending one is waiting on; only 'admin' ones can be decided here. */
+  waitingOn: 'admin' | 'customer' | null;
+  /** The shop let the accept window run out rather than refusing — turning it down leaves the order with them. */
+  originalStillOpen: boolean;
   reason: string | null;
   fromVendorId: number | null;
   fromVendorName: string | null;
@@ -986,7 +1002,7 @@ export interface InvoiceSummary {
  */
 export type SettlementStatus = 'draft' | 'pending_approval' | 'approved' | 'paid' | 'on_hold' | 'failed';
 
-export type DeductionKind = 'commission' | 'refund' | 'tds' | 'tcs' | 'penalty' | 'adjustment' | 'other';
+export type DeductionKind = 'commission' | 'refund' | 'tds' | 'tcs' | 'penalty' | 'adjustment' | 'other' | 'advertising';
 
 export interface SettlementDeduction {
   id: number;
@@ -1091,6 +1107,8 @@ export interface AdminCreditNote {
   cgstCents: number;
   sgstCents: number;
   igstCents: number;
+  /** The share of the order's after-tax discount on these lines; not paid back. */
+  discountCents: number;
   totalCents: number;
   status: 'issued' | 'cancelled';
   /** The money side. A credit note can exist before its refund is paid out. */
@@ -1185,6 +1203,8 @@ export interface AdminReturn {
   status: ReturnStatus;
   reason: ReturnReason;
   reasonNote: string | null;
+  /** What the customer asked for. A replacement continues on the Replacements page. */
+  resolution: 'refund' | 'replacement';
   itemCount: number;
   refundableCents: number;
   /** What an admin actually authorised. Below refundable when something is deducted. */
@@ -1359,6 +1379,10 @@ export interface AdminCancellation {
   /** Charged per the rule for that stage. An admin can waive it. */
   feeCents: number;
   refundCents: number;
+  /** Paid and still refundable; the refund is this less the fee. Zero for unpaid COD. */
+  refundableCents: number;
+  /** The stage fee the request was raised under. */
+  feePercent: number;
   paymentStatus: string | null;
   refundId: number | null;
   refundStatus: string | null;
@@ -1430,6 +1454,9 @@ export interface AdminBusinessAccount {
   /** Zero means prepaid only — the account has no credit at all. */
   creditLimitCents: number;
   creditUsedCents: number;
+  creditAvailableCents: number;
+  /** Credit orders past their terms that payments haven't covered. Blocks new credit orders. */
+  overdueCents: number;
   paymentTermsDays: number;
   memberCount: number;
   addressCount: number;
@@ -1450,10 +1477,21 @@ export interface BusinessAccountDocument {
   uploadedAt: string;
 }
 
+/** Money the business paid against its credit. */
+export interface BusinessCreditPayment {
+  id: number;
+  amountCents: number;
+  reference: string;
+  note: string | null;
+  receivedAt: string;
+  recordedByName: string | null;
+}
+
 export interface BusinessAccountDetail extends AdminBusinessAccount {
   addresses: BusinessAddress[];
   members: BusinessMember[];
   documents: BusinessAccountDocument[];
+  creditPayments: BusinessCreditPayment[];
 }
 
 export interface BusinessAccountSummary {
@@ -1911,6 +1949,21 @@ export interface DeliveryPartnerDetail extends AdminDeliveryPartner {
   assignments: PartnerAssignment[];
 }
 
+/** A partner as a candidate for one shipment, with why they can't take it if not. */
+export interface PartnerCandidate {
+  id: number;
+  name: string;
+  type: PartnerType;
+  phone: string;
+  activeAssignments: number;
+  dailyCapacity: number;
+  isOnline: boolean;
+  /** Covers the delivery pincode/area/city. Null when the address is unknown. */
+  coversArea: boolean | null;
+  available: boolean;
+  reason: string | null;
+}
+
 export interface DeliveryPartnerSummary {
   pending: number;
   active: number;
@@ -2107,6 +2160,472 @@ export interface AnalyticsResponse {
   funnel: FunnelStage[];
 }
 
+/** Channels — every communication, verification, notification, marketing and integration channel. */
+export type ChannelGroup = 'communication' | 'verification' | 'notification' | 'marketing' | 'integration';
+
+export interface ChannelEntry {
+  group: ChannelGroup;
+  key: string;
+  name: string;
+  description: string;
+  /** available: set up here · built_in: works without a provider · coming_soon */
+  status: 'available' | 'built_in' | 'coming_soon';
+}
+
+export interface WhatsAppOverview {
+  setUp: boolean;
+  platform: Platform | null;
+  /** Settings saved and the connection test passed for the environment in use. */
+  ready: boolean;
+  environment?: PlatformEnvironment;
+  connectionStatus?: 'not_connected' | 'connected' | 'error';
+  lastTestedAt?: string | null;
+  lastError?: string | null;
+  templates?: { approved: number; pending: number; drafts: number; rejected: number };
+  last24h?: { sent: number; failed: number; queued: number };
+}
+
+export interface ChannelsResponse {
+  whatsapp: WhatsAppOverview;
+  channels: ChannelEntry[];
+}
+
+export type WhatsAppTemplateStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'paused' | 'disabled';
+export type WhatsAppCategory = 'UTILITY' | 'AUTHENTICATION' | 'MARKETING';
+
+export interface WhatsAppButton {
+  type: 'URL' | 'PHONE_NUMBER' | 'QUICK_REPLY';
+  text: string;
+  url?: string;
+  phone?: string;
+  example?: string;
+}
+
+export interface WhatsAppTemplate {
+  id: number;
+  name: string;
+  language: string;
+  category: WhatsAppCategory;
+  headerText: string | null;
+  bodyText: string;
+  footerText: string | null;
+  buttons: WhatsAppButton[];
+  bodyExamples: string[];
+  variableCount: number;
+  /** The body filled in with the samples. */
+  preview: string;
+  status: WhatsAppTemplateStatus;
+  metaTemplateId: string | null;
+  rejectedReason: string | null;
+  purpose: string | null;
+  submittedAt: string | null;
+  lastSyncedAt: string | null;
+  updatedAt: string;
+}
+
+export interface WhatsAppTemplatesResponse {
+  items: WhatsAppTemplate[];
+  languages: string[];
+  categories: WhatsAppCategory[];
+}
+
+export type WhatsAppMessageStatus = 'queued' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | 'received' | 'skipped';
+
+export interface WhatsAppMessage {
+  id: number;
+  direction: 'out' | 'in';
+  phone: string;
+  userId: number | null;
+  userName: string | null;
+  kind: 'template' | 'text';
+  templateName: string | null;
+  language: string | null;
+  variables: string[];
+  body: string | null;
+  status: WhatsAppMessageStatus;
+  metaMessageId: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  /** For skipped: why nothing was sent (opted out, no number…). */
+  skipReason: string | null;
+  orderId: number | null;
+  checkoutGroupId: number | null;
+  attempts: number;
+  nextAttemptAt: string | null;
+  event: string | null;
+  environment: PlatformEnvironment | null;
+  createdAt: string;
+  sentAt: string | null;
+  deliveredAt: string | null;
+  readAt: string | null;
+  failedAt: string | null;
+}
+
+/* ------------------------------------------------ Ad Promotions — pricing */
+
+export type AdLevelKey = 'local' | 'city' | 'district' | 'state' | 'country' | 'international';
+export type AdRegionLevel = 'country' | 'state' | 'district' | 'city' | 'locality';
+export type AdModel = 'fixed' | 'commission' | 'fixed_commission' | 'package';
+
+export interface AdSettings {
+  models: { fixed: boolean; commission: boolean; fixedCommission: boolean; package: boolean };
+  commissionPercent: number;
+  fixedCommissionPercent: number;
+  attributionDays: number;
+  taxPercent: number;
+  taxLabel: string;
+  sacCode: string;
+  currency: string;
+  homeCountry: string;
+  minChargeCents: number;
+  minBudgetCents: number;
+  maxBudgetCents: number;
+  maxHours: number;
+  cancellationFeePercent: number;
+  prorataRefund: boolean;
+  updatedAt: string;
+}
+
+export interface AdRatePack {
+  id: number;
+  hours: number;
+  priceCents: number;
+  active: boolean;
+}
+
+export interface AdLevel {
+  key: AdLevelKey;
+  label: string;
+  description: string | null;
+  minHours: number;
+  active: boolean;
+  sortOrder: number;
+  packs: AdRatePack[];
+}
+
+export interface AdRegion {
+  id: number;
+  level: AdRegionLevel;
+  name: string;
+  parentId: number | null;
+  countryCode: string;
+  latitude: number | null;
+  longitude: number | null;
+  radiusKm: number | null;
+  audienceEstimate: number | null;
+  priceMultiplier: number;
+  active: boolean;
+  childCount: number;
+}
+
+export interface AdPlacement {
+  key: string;
+  name: string;
+  description: string | null;
+  formats: string[];
+  allowedLevels: AdLevelKey[];
+  maxLivePerRegion: number;
+  premiumPercent: number;
+  premiumCents: number;
+  sponsoredLabel: boolean;
+  active: boolean;
+  sortOrder: number;
+}
+
+export type AdRuleKind = 'seasonal' | 'peak' | 'volume' | 'category' | 'enterprise' | 'multi_region';
+
+export interface AdPricingRule {
+  id: number;
+  name: string;
+  kind: AdRuleKind;
+  conditions: { fromHour?: number; toHour?: number; minHours?: number; minRegions?: number; categoryIds?: number[]; vendorIds?: number[] };
+  adjustPercent: number;
+  priority: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  active: boolean;
+  updatedAt: string;
+}
+
+export interface AdPackage {
+  id: number;
+  name: string;
+  tier: 'basic' | 'growth' | 'premium' | 'enterprise' | 'custom';
+  description: string | null;
+  level: AdLevelKey;
+  hours: number;
+  priceCents: number;
+  placements: string[];
+  maxRegions: number;
+  active: boolean;
+  sortOrder: number;
+}
+
+export interface AdCoupon {
+  id: number;
+  code: string;
+  kind: 'percent' | 'flat';
+  value: number;
+  maxDiscountCents: number | null;
+  minSpendCents: number;
+  maxUses: number | null;
+  usedCount: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  active: boolean;
+}
+
+export interface AdOptions {
+  shops: { id: number; name: string; city: string | null }[];
+  categories: { id: number; name: string }[];
+  packages: AdPackage[];
+  regionLevelFor: Record<AdLevelKey, AdRegionLevel>;
+}
+
+export interface AdQuoteLine {
+  kind: 'placement' | 'rule' | 'package' | 'coupon' | 'minimum' | 'commission';
+  label: string;
+  amountCents: number;
+  baseCents?: number;
+  premiumCents?: number;
+}
+
+export interface AdQuote {
+  model: AdModel;
+  level: AdLevelKey;
+  hours: number;
+  startsAt: string;
+  endsAt: string;
+  currency: string;
+  lines: AdQuoteLine[];
+  subtotalCents: number;
+  discountCents: number;
+  taxableCents: number;
+  taxPercent: number;
+  taxLabel: string;
+  taxCents: number;
+  totalCents: number;
+  commissionPercent: number;
+  attributionDays: number | null;
+  audienceEstimate: number | null;
+  snapshot: { duration: { cents: number; coveredHours: number; packs: { hours: number; priceCents: number; count: number }[] } | null };
+}
+
+/* ---------------------------------------------- Ad Promotions — campaigns */
+
+export type AdCampaignStatus =
+  | 'draft' | 'pending_payment' | 'pending_approval' | 'scheduled' | 'live' | 'paused' | 'completed' | 'rejected' | 'cancelled';
+export type AdPaymentStatus = 'unpaid' | 'pending' | 'paid' | 'not_required' | 'refunded' | 'partially_refunded';
+
+export interface AdCampaign {
+  id: number;
+  reference: string;
+  vendorId: number;
+  shopName: string;
+  shopCity: string | null;
+  title: string;
+  thumbnail: string | null;
+  model: AdModel;
+  level: AdLevelKey;
+  placements: string[];
+  regionNames: string;
+  startsAt: string;
+  endsAt: string;
+  hours: number;
+  status: AdCampaignStatus;
+  paymentStatus: AdPaymentStatus;
+  totalCents: number;
+  paidCents: number;
+  refundedCents: number;
+  commissionPercent: number;
+  createdByRole: 'admin' | 'vendor';
+  createdAt: string;
+}
+
+export interface AdCampaignList extends Paged<AdCampaign> {
+  counts: Record<AdCampaignStatus, number>;
+}
+
+export interface AdCampaignPayment {
+  id: number;
+  purpose: 'booking' | 'extension';
+  method: 'settlement' | 'offline' | 'online';
+  amountCents: number;
+  taxCents: number;
+  status: 'pending' | 'paid' | 'cancelled' | 'failed';
+  reference: string | null;
+  extensionHours: number | null;
+  invoiceNumber: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+export interface AdCampaignRefund {
+  id: number;
+  method: 'settlement' | 'offline' | 'online';
+  amountCents: number;
+  reason: string;
+  status: 'pending' | 'completed';
+  reference: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface AdCampaignDetail extends AdCampaign {
+  description: string | null;
+  offerText: string | null;
+  ctaLabel: string | null;
+  ctaKind: 'shop' | 'product' | 'url' | 'call' | 'whatsapp';
+  ctaTarget: string | null;
+  discountCampaign: { id: number; name: string } | null;
+  categoryId: number | null;
+  packageId: number | null;
+  couponCode: string | null;
+  regionIds: number[];
+  regions: { id: number; name: string; level: AdRegionLevel; parentName: string | null; multiplier: number }[];
+  subtotalCents: number;
+  discountCents: number;
+  taxableCents: number;
+  taxCents: number;
+  priceLines: AdQuoteLine[];
+  rejectionReason: string | null;
+  cancelReason: string | null;
+  approvedAt: string | null;
+  wentLiveAt: string | null;
+  completedAt: string | null;
+  assets: { id: number; url: string; kind: 'banner' | 'card' | 'square'; width: number | null; height: number | null }[];
+  payments: AdCampaignPayment[];
+  refunds: AdCampaignRefund[];
+  invoices: {
+    id: number; number: string; date: string; supplyType: 'intra_state' | 'inter_state'; taxableCents: number;
+    cgstCents: number; sgstCents: number; igstCents: number; totalCents: number; buyerGstin: string | null; sellerGstin: string | null; description: string;
+  }[];
+  history: { id: number; from: string | null; to: string; actorRole: string; actorName: string | null; note: string | null; at: string }[];
+}
+
+export interface AdPaymentsResponse {
+  totals: {
+    revenueCents: number; taxCents: number; refundsCents: number; taxRefundsCents: number; netRevenueCents: number;
+    discountsCents: number; pendingCents: number; refundsPendingCents: number; awaitingPayoutCents: number;
+  };
+  items: {
+    id: number; campaignId: number; campaignReference: string; title: string; shopName: string; purpose: 'booking' | 'extension';
+    method: 'settlement' | 'offline' | 'online'; amountCents: number; taxCents: number; status: 'pending' | 'paid' | 'cancelled' | 'failed';
+    bankReference: string | null; extensionHours: number | null; invoiceNumber: string | null; paidAt: string | null; createdAt: string;
+  }[];
+  total: number;
+  page: number;
+  pageSize: number;
+  refunds: {
+    id: number; campaignId: number; campaignReference: string; title: string; shopName: string; method: 'settlement' | 'offline' | 'online';
+    amountCents: number; reason: string; status: 'pending' | 'completed'; bankReference: string | null; createdAt: string; completedAt: string | null;
+  }[];
+}
+
+/* ---------------------------------------------- Ad Promotions — results */
+
+export interface AdRevenueSlice {
+  key: string;
+  label: string;
+  revenueCents: number;
+  level?: AdRegionLevel;
+}
+
+export interface AdDashboard {
+  range: { from: string; to: string };
+  kpis: {
+    totalShops: number;
+    shopsAdvertising: number;
+    campaigns: {
+      total: number; live: number; scheduled: number; pendingApproval: number; pendingPayment: number;
+      completed: number; rejected: number; cancelled: number;
+    };
+    revenueCents: number;
+    grossRevenueCents: number;
+    refundsCents: number;
+    commissionCents: number;
+    taxCents: number;
+    pendingPaymentsCents: number;
+    refundsPendingCents: number;
+    impressions: number;
+    clicks: number;
+    ctr: number | null;
+    enquiries: number;
+    orders: number;
+    orderValueCents: number;
+    conversionRate: number | null;
+    redemptions: number;
+  };
+  series: { date: string; revenueCents: number; commissionCents: number; impressions: number; clicks: number }[];
+  byLevel: AdRevenueSlice[];
+  byDuration: AdRevenueSlice[];
+  byPlacement: AdRevenueSlice[];
+  byRegion: AdRevenueSlice[];
+  topShops: { vendorId: number; name: string; revenueCents: number; commissionCents: number; campaigns: number; clicks: number; orders: number }[];
+  topCampaigns: {
+    id: number; reference: string; title: string; shopName: string; status: AdCampaignStatus; revenueCents: number; commissionCents: number;
+    impressions: number; clicks: number; ctr: number | null; orders: number; redemptions: number;
+  }[];
+}
+
+export interface AdCampaignStats {
+  impressions: number;
+  clicks: number;
+  enquiries: number;
+  ctr: number | null;
+  orders: number;
+  orderValueCents: number;
+  commissionCents: number;
+  byDay: { date: string; impressions: number; clicks: number }[];
+  byPlacement: { placement: string; impressions: number; clicks: number; orders: number }[];
+}
+
+/** An automatic WhatsApp update on an order event. */
+export interface WhatsAppRule {
+  event: string;
+  label: string;
+  description: string;
+  /** What the event fills {{1}}, {{2}}… with, in order. */
+  variables: string[];
+  enabled: boolean;
+  enabledAt: string | null;
+  templateName: string;
+  language: string;
+  templateStatus: WhatsAppTemplateStatus | null;
+  /** The template with the variables shown as [labels]. */
+  preview: string | null;
+  /** Why it can't send, when it can't. */
+  problem: string | null;
+  sendsNow: boolean;
+  last7d: { sent: number; skipped: number; failed: number };
+}
+
+export interface WhatsAppRulesResponse {
+  items: WhatsAppRule[];
+  connected: boolean;
+  platformActive: boolean;
+  maxAgeHours: number;
+}
+
+/** A service key the Gloaro WhatsApp bot uses to place orders for customers. */
+export interface BotKey {
+  id: number;
+  name: string;
+  /** The first characters, to tell keys apart. The full key is shown once. */
+  prefix: string;
+  createdAt: string;
+  createdByName: string | null;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface BotKeysResponse {
+  items: BotKey[];
+  ordersLast30Days: number;
+  salesChannel: string;
+  sessionMinutes: number;
+}
+
 /** What the signed-in admin may do. Drives which menus the panel shows. */
 export interface StaffMe {
   userId: number;
@@ -2152,4 +2671,179 @@ export interface AdminNotification {
   deep_link: string | null;
   read_at: string | null;
   created_at: string;
+}
+
+export type PlatformMethod = 'api' | 'webhook' | 'connector' | 'manual';
+export type PlatformStatus = 'draft' | 'inactive' | 'active';
+
+/** Settings → Platform Registry: a group of e-commerce capabilities. */
+export interface PlatformCategory {
+  id: number;
+  slug: string;
+  name: string;
+  description: string | null;
+  icon_key: string;
+  sort_order: number;
+  /** Seeded categories can be renamed or hidden, never deleted. */
+  is_system: boolean;
+  is_active: boolean;
+  platform_count: number;
+  active_count: number;
+}
+
+/**
+ * One registry entry. `status` is whether the business uses it; `connected`
+ * is true only when server-side connector code backs it — a row alone never is.
+ */
+export interface Platform {
+  id: number;
+  category_id: number;
+  category_slug: string;
+  category_name: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  logo_url: string | null;
+  integration_method: PlatformMethod;
+  connector_key: string | null;
+  connected: boolean;
+  status: PlatformStatus;
+  capabilities: string[];
+  sort_order: number;
+  updated_at: string;
+  config_schema: PlatformField[];
+  /** Which saved settings are in use. */
+  environment: PlatformEnvironment;
+  connection_status: 'not_connected' | 'connected' | 'error';
+  /** Every required setting of the environment in use is filled in. */
+  setup_complete: boolean;
+}
+
+export type PlatformFieldType = 'text' | 'textarea' | 'password' | 'url' | 'number' | 'select' | 'boolean';
+export type PlatformEnvironment = 'test' | 'live';
+
+/** One setting on a platform's generated settings form. */
+export interface PlatformField {
+  key: string;
+  label: string;
+  type: PlatformFieldType;
+  required: boolean;
+  /** Stored encrypted and never sent back; password fields always are. */
+  secret: boolean;
+  options?: string[];
+  help?: string;
+}
+
+/** One environment's saved settings, as far as the panel may see them. */
+export interface PlatformConnection {
+  environment: PlatformEnvironment;
+  values: Record<string, string | number | boolean>;
+  /** Which secrets are set — never their values. */
+  secretsSet: Record<string, boolean>;
+  missingRequired: string[];
+  complete: boolean;
+  status: 'not_connected' | 'connected' | 'error';
+  lastTestedAt: string | null;
+  lastError: string | null;
+  updatedAt: string | null;
+}
+
+export interface PlatformConnections {
+  schema: PlatformField[];
+  environment: PlatformEnvironment;
+  /** False when the server has no PLATFORM_SECRETS_KEY, so secrets can't be saved. */
+  canStoreSecrets: boolean;
+  /** True only when real connector code backs this platform. */
+  canTest: boolean;
+  connector: { key: string; name: string } | null;
+  /** Where the provider should send events (prefix with the API host); null without a connector. */
+  webhookPath: string | null;
+  connections: PlatformConnection[];
+}
+
+/** Connector code built into the server, with the settings it needs. */
+export interface PlatformConnectorInfo {
+  key: string;
+  name: string;
+  /** The registry category it usually belongs in. */
+  category: string;
+  description: string;
+  capabilities: string[];
+  settings: PlatformField[];
+}
+
+/** One test, webhook or sync exchange with a provider. Never holds credentials. */
+export interface PlatformSyncLog {
+  id: number;
+  environment: PlatformEnvironment;
+  kind: 'test' | 'webhook' | 'sync';
+  status: 'ok' | 'error' | 'rejected';
+  event: string | null;
+  message: string | null;
+  detail: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface ApprovalRule {
+  action: string;
+  label: string;
+  description: string | null;
+  requires_approval: boolean;
+  pending_count: number;
+  updated_at: string;
+}
+
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'failed';
+
+/** A held change. `details` is the visible copy only — never secret values. */
+export interface ApprovalRequest {
+  id: number;
+  action: string;
+  action_label: string;
+  entity_type: string;
+  entity_id: string | null;
+  summary: string;
+  details: Record<string, unknown>;
+  status: ApprovalStatus;
+  decision_note: string | null;
+  result_message: string | null;
+  created_at: string;
+  decided_at: string | null;
+  requested_by_user_id: number | null;
+  requested_by_name: string | null;
+  requested_by_email: string | null;
+  decided_by_name: string | null;
+}
+
+export type PlatformHealthLevel = 'healthy' | 'degraded' | 'down' | 'unknown' | 'manual' | 'off';
+
+/** One line of the registry health overview; counts cover the environment in use, last 24 hours. */
+export interface PlatformHealthRow {
+  id: number;
+  slug: string;
+  name: string;
+  status: PlatformStatus;
+  environment: PlatformEnvironment;
+  connector_key: string | null;
+  capabilities: string[];
+  logo_url: string | null;
+  category_slug: string;
+  category_name: string;
+  connection_status: 'not_connected' | 'connected' | 'error' | null;
+  last_tested_at: string | null;
+  last_error: string | null;
+  ok_24h: number;
+  errors_24h: number;
+  rejected_24h: number;
+  webhooks_24h: number;
+  last_event_at: string | null;
+  /** Orders through it in the last 7 days; null unless it has the "orders" capability. */
+  orders_7d: number | null;
+  health: PlatformHealthLevel;
+  recent_problems: { kind: string; status: string; event: string | null; message: string | null; created_at: string }[];
+}
+
+export interface PlatformHealth {
+  summary: Partial<Record<PlatformHealthLevel, number>>;
+  platforms: PlatformHealthRow[];
 }

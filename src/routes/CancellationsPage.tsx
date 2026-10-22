@@ -356,7 +356,11 @@ function DecisionModal({
   const [busy, setBusy] = useState(false);
 
   const feeCents = Math.round(Number(fee) * 100);
-  const refund = Number.isFinite(feeCents) ? request.orderTotalCents - Math.max(0, feeCents) : request.refundCents;
+  // The fee comes out of what was paid, never more — unpaid COD has nothing to refund or keep.
+  const refund = Number.isFinite(feeCents)
+    ? request.refundableCents - Math.min(Math.max(0, feeCents), request.refundableCents)
+    : request.refundCents;
+  const vendorAsked = request.requestedBy === 'vendor';
   const moved = request.currentOrderStatus !== request.orderStatusAtRequest;
 
   async function submit(e: FormEvent) {
@@ -433,6 +437,12 @@ function DecisionModal({
 
         {mode === 'approve' ? (
           <>
+            {request.refundableCents === 0 && (
+              <p className="rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600">
+                Nothing has been paid online for this order, so there is no refund and no fee.
+              </p>
+            )}
+            {!vendorAsked && request.refundableCents > 0 && (
             <label className="block">
               <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">
                 Cancellation fee (₹)
@@ -446,9 +456,10 @@ function DecisionModal({
                 className={inputClass}
               />
               <span className="mt-1 block text-[11px] text-slate-500">
-                Set by the rule for this stage. Zero it to waive.
+                {request.feePercent}% under the rule for this stage when it was asked. Zero it to waive.
               </span>
             </label>
+            )}
             <div className="flex items-baseline justify-between rounded-xl border border-slate-200 px-3.5 py-2.5">
               <span className="text-sm text-slate-600">Refund to customer</span>
               <span className="text-base font-extrabold text-ink tabular-nums">{rupees(Math.max(0, refund))}</span>

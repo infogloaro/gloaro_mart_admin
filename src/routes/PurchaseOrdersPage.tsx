@@ -361,6 +361,8 @@ function PurchaseOrderModal({
   }
 
   const open = data != null && OPEN_STATUSES.includes(data.status);
+  // Delivered in full is no longer open, but closing is what's left to do.
+  const closable = open || data?.status === 'delivered';
   const delivered = data != null && data.fulfilledRatio >= 1;
   const settled = data != null && data.paidCents >= data.invoicedCents && data.invoicedCents > 0;
 
@@ -588,7 +590,7 @@ function PurchaseOrderModal({
                   Cancel PO
                 </button>
               )}
-              {open && (
+              {closable && (
                 <button
                   onClick={() => run('close', undefined, 'Could not close the purchase order.')}
                   disabled={busy || !delivered || !settled}
@@ -601,7 +603,7 @@ function PurchaseOrderModal({
                       : 'Close purchase order'}
                 </button>
               )}
-              {!open && (
+              {!closable && (
                 <span className="text-[11px] text-slate-400">
                   {label(data.status)} {formatDate(data.closedAt)} — nothing further to do.
                 </span>
