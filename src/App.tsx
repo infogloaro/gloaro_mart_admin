@@ -54,6 +54,7 @@ import FeatureFlagsPage from './routes/FeatureFlagsPage';
 import PlatformRegistryPage from './routes/PlatformRegistryPage';
 import ChannelsPage from './routes/ChannelsPage';
 import AdPricingPage from './routes/AdPricingPage';
+import RewardsSettingsPage from './routes/RewardsSettingsPage';
 import AdCampaignsPage from './routes/AdCampaignsPage';
 import AdPaymentsPage from './routes/AdPaymentsPage';
 import AdDashboardPage from './routes/AdDashboardPage';
@@ -125,6 +126,7 @@ export default function App() {
             <Route path="/channels" element={<ChannelsPage />} />
             <Route path="/ads" element={<AdDashboardPage />} />
             <Route path="/ads/pricing" element={<AdPricingPage />} />
+            <Route path="/rewards" element={<RewardsSettingsPage />} />
             <Route path="/ads/campaigns" element={<AdCampaignsPage />} />
             <Route path="/ads/payments" element={<AdPaymentsPage />} />
             <Route path="/ads/taps" element={<AdTapReviewPage />} />

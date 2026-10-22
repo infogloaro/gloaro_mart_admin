@@ -296,6 +296,7 @@ export const NAV_GROUPS: NavGroup[] = [
         status: "live",
         permission: "ad_promotions.view",
       },
+      { to: "/rewards", label: "Reward Points", icon: "star", status: "live", permission: "rewards.view" },
       {
         // A personal inbox scoped to the signed-in account, like Settings'
         // profile tab — every admin sees their own regardless of role, so
