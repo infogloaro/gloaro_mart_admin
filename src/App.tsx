@@ -66,7 +66,7 @@ import AdTapReviewPage from './routes/AdTapReviewPage';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '') || undefined}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<RequireAdmin />}>

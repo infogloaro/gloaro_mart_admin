@@ -1,3 +1,16 @@
+# Gloaro Mart admin console
+
+## Live deploy
+
+The live console is served by the backend at **https://gloaro-mart-backend.onrender.com/admin** (no separate host).
+
+1. `npm run build:live`: builds with `.env.live` (the live API) and base `/admin/` straight into `Gloaro_mart_backend/admin_console/`.
+2. Commit `admin_console/` in the backend repo and push its `main`; Render redeploys and the new console shows on the next visit.
+
+Local development is unchanged: `npm run dev` (base `/`, API from `.env`). Without `VITE_API_URL` a build falls back to an old backend address, so always build the live console with `build:live`.
+
+---
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.

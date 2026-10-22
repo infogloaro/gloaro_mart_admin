@@ -73,8 +73,9 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
   // read as an endless redirect to the login screen.
   if (res.status === 401) {
     clearToken();
-    if (window.location.pathname !== '/login') {
-      window.location.assign('/login');
+    const loginPath = `${import.meta.env.BASE_URL}login`;
+    if (window.location.pathname !== loginPath) {
+      window.location.assign(loginPath);
     }
   }
 

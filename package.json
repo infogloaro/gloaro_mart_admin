@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:live": "tsc -b && vite build --mode live --base=/admin/ --outDir Gloaro_mart_backend/admin_console --emptyOutDir"
   },
   "dependencies": {
     "jwt-decode": "^4.0.0",

@@ -177,7 +177,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
 
   function handleLogout() {
     clearToken();
-    window.location.assign('/login');
+    window.location.assign(`${import.meta.env.BASE_URL}login`);
   }
 
   // The drawer always shows the full rail: an icon-only drawer helps nobody.
