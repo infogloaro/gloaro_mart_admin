@@ -499,7 +499,17 @@ export interface CommissionPlan {
   vendor_name: string | null;
 }
 
-export type VendorDocumentType = 'gstin' | 'pan' | 'bank' | 'fssai' | 'other';
+export type VendorDocumentType =
+  | 'gstin'
+  | 'pan'
+  | 'bank'
+  | 'fssai'
+  | 'other'
+  | 'aadhaar'
+  | 'voter_id'
+  | 'driving_licence'
+  | 'shop_photo'
+  | 'signature';
 export type VendorDocumentStatus = 'pending' | 'approved' | 'rejected';
 
 export interface VendorDocument {

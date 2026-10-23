@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, ApiError, isMissingEndpoint } from '../lib/api';
+import { api, ApiError, assetUrl, isMissingEndpoint } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
 import { DataTable } from '../components/ui/DataTable';
 import { FilterTabs } from '../components/ui/FilterTabs';
@@ -33,6 +33,12 @@ const DOC_TYPES: { value: VendorDocumentType; label: string }[] = [
   { value: 'bank', label: 'Bank account' },
   { value: 'fssai', label: 'FSSAI licence' },
   { value: 'other', label: 'Other' },
+  // Sent by the vendor from the app at sign-up (VK1); ID numbers arrive masked.
+  { value: 'aadhaar', label: 'Aadhaar' },
+  { value: 'voter_id', label: 'Voter ID' },
+  { value: 'driving_licence', label: 'Driving licence' },
+  { value: 'shop_photo', label: 'Shop photo' },
+  { value: 'signature', label: 'Signature' },
 ];
 
 const TYPE_LABEL = Object.fromEntries(DOC_TYPES.map((t) => [t.value, t.label])) as Record<
@@ -287,7 +293,7 @@ export default function VendorKycPage() {
                     {d.doc_number && <div className="font-mono text-xs text-slate-500">{d.doc_number}</div>}
                     {d.file_url && (
                       <a
-                        href={d.file_url}
+                        href={assetUrl(d.file_url)}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-1 text-xs font-semibold text-emerald hover:underline"
