@@ -5,9 +5,11 @@ import { api, ApiError } from '../lib/api';
 import { setToken, type AdminJwtPayload } from '../lib/auth';
 import { Icon } from '../components/ui/Icon';
 import { Logo } from '../components/ui/Logo';
+import { useBrand } from '../lib/brand';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const brand = useBrand();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +45,7 @@ export default function LoginPage() {
           <div className="mx-auto mb-3.5 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)]">
             <Logo className="h-11 w-11" />
           </div>
-          <div className="text-lg font-extrabold tracking-[0.1em] text-white">GLOARO MART</div>
+          <div className="text-lg font-extrabold tracking-[0.1em] text-white uppercase">{brand.name ?? 'Gloaro Mart'}</div>
           <div className="mt-0.5 text-xs font-medium text-mint-soft">Admin Console</div>
         </div>
 

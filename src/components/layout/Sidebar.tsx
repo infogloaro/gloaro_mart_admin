@@ -5,6 +5,7 @@ import { NAV_GROUPS, type NavGroup, type NavItem } from '../../lib/navigation';
 import { canView, useStaffMe } from '../../lib/staffContext';
 import { Icon } from '../ui/Icon';
 import { Logo } from '../ui/Logo';
+import { useBrand } from '../../lib/brand';
 
 function ComingSoonPill() {
   return (
@@ -138,6 +139,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
   const { pathname } = useLocation();
   const [query, setQuery] = useState('');
   const me = useStaffMe();
+  const brand = useBrand();
 
   // The drawer sits over the page, so Escape has to be able to dismiss it.
   useEffect(() => {
@@ -211,7 +213,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
           </div>
           {!isRail && (
             <div className="leading-tight">
-              <div className="text-[13px] font-extrabold tracking-[0.08em] text-white">GLOARO MART</div>
+              <div className="text-[13px] font-extrabold tracking-[0.08em] text-white uppercase">{brand.name ?? 'Gloaro Mart'}</div>
               <div className="text-[10px] font-semibold tracking-wide text-gold/70">Admin Console</div>
             </div>
           )}

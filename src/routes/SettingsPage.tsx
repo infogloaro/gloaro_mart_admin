@@ -5,6 +5,7 @@ import { useApiData } from '../lib/useApiData';
 import { Icon } from '../components/ui/Icon';
 import { ImageUpload } from '../components/ui/ImageUpload';
 import { clearToken } from '../lib/auth';
+import { notifyBrandChanged } from '../lib/brand';
 import type { PlatformSettings } from '../lib/types';
 
 /** Form state is all strings — inputs give strings, and the API takes nulls for blanks. */
@@ -289,6 +290,7 @@ export default function SettingsPage() {
       await api.put('/api/admin/settings', body);
       setNotice('Settings saved.');
       reload();
+      notifyBrandChanged();
     } catch (e) {
       setSaveError(e instanceof ApiError ? e.message : 'Failed to save settings.');
     } finally {
