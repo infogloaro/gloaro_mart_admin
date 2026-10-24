@@ -20,6 +20,7 @@ import type {
   WhatsAppMessage,
   WhatsAppMessageStatus,
   WhatsAppOverview,
+  WhatsAppProviderKey,
   WhatsAppTemplate,
   WhatsAppRule,
   WhatsAppRulesResponse,
@@ -199,12 +200,42 @@ function WhatsAppCard({ wa, onChanged }: { wa: WhatsAppOverview; onChanged: () =
     }
   }
 
-  const steps = [
-    { done: wa.setUp && Boolean(wa.platform?.setup_complete), text: 'Enter the phone number ID, business account ID, access token and app secret' },
-    { done: wa.connectionStatus === 'connected', text: 'Test the connection (Configure → Settings → Test)' },
-    { done: (wa.templates?.approved ?? 0) > 0, text: 'Submit templates to Meta, or Sync to bring in approved ones' },
-    { done: wa.platform?.status === 'active', text: 'Set the platform Active in Configure, so Meta’s webhook is accepted' },
-  ];
+  async function switchProvider(key: WhatsAppProviderKey) {
+    if (key === provider) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      await api.put('/api/admin/channels/whatsapp/provider', { provider: key });
+      onChanged();
+      setNotice({
+        tone: 'ok',
+        text:
+          key === 'ultramsg'
+            ? 'WhatsApp now sends through UltraMsg. Order updates use the templates’ text as it is — no Meta approval needed.'
+            : 'WhatsApp now sends through Meta. Only approved templates are sent.',
+      });
+    } catch (err) {
+      setNotice({ tone: 'error', text: err instanceof ApiError ? err.message : 'Could not switch the provider.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const provider: WhatsAppProviderKey = wa.provider ?? 'whatsapp_cloud';
+  const ultra = provider === 'ultramsg';
+  const steps = ultra
+    ? [
+        { done: wa.setUp && Boolean(wa.platform?.setup_complete), text: 'Scan the QR code in the UltraMsg dashboard, then enter the instance ID and token' },
+        { done: wa.connectionStatus === 'connected', text: 'Test the connection (Configure → Settings → Test)' },
+        { done: wa.platform?.status === 'active', text: 'Set the platform Active in Configure, so messages go out and the webhook is accepted' },
+        { done: false, text: 'In UltraMsg, set the webhook URL to …/api/webhooks/platforms/whatsapp_ultramsg?secret=<webhook secret>, with “message received” and “message ack” on — so START / STOP work' },
+      ]
+    : [
+        { done: wa.setUp && Boolean(wa.platform?.setup_complete), text: 'Enter the phone number ID, business account ID, access token and app secret' },
+        { done: wa.connectionStatus === 'connected', text: 'Test the connection (Configure → Settings → Test)' },
+        { done: (wa.templates?.approved ?? 0) > 0, text: 'Submit templates to Meta, or Sync to bring in approved ones' },
+        { done: wa.platform?.status === 'active', text: 'Set the platform Active in Configure, so Meta’s webhook is accepted' },
+      ];
 
   return (
     <section className="card p-5">
@@ -215,7 +246,9 @@ function WhatsAppCard({ wa, onChanged }: { wa: WhatsAppOverview; onChanged: () =
           </span>
           <div>
             <h2 className="text-base font-bold text-ink">WhatsApp</h2>
-            <p className="text-xs text-slate-500">Meta Cloud API · order updates, shop alerts and customer replies</p>
+            <p className="text-xs text-slate-500">
+              {ultra ? 'UltraMsg' : 'Meta Cloud API'} · order updates, shop alerts and customer replies
+            </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -262,6 +295,33 @@ function WhatsAppCard({ wa, onChanged }: { wa: WhatsAppOverview; onChanged: () =
         </div>
       </div>
 
+      {wa.providers && (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <span className={labelClass + ' mb-0'}>Sends through</span>
+          <div className="inline-flex gap-1 rounded-lg border border-slate-200 bg-white p-0.5">
+            {wa.providers.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                disabled={busy}
+                onClick={() => switchProvider(p.key)}
+                className={`rounded-md px-3 py-1 text-xs font-semibold disabled:opacity-50 ${
+                  p.inUse ? 'bg-emerald text-white' : 'text-slate-500 hover:bg-mint-mist hover:text-emerald-deep'
+                }`}
+              >
+                {p.label}
+                {p.connectionStatus === 'connected' && <span className="ml-1">✓</span>}
+              </button>
+            ))}
+          </div>
+          <span className="text-[11px] text-slate-400">
+            {ultra
+              ? 'Temporary: plain-text messages from a QR-linked number, no Meta approval. Keep volumes low — WhatsApp may block numbers that use unofficial APIs.'
+              : 'Official: approved templates only. Switch to UltraMsg while Meta approval is pending.'}
+          </span>
+        </div>
+      )}
+
       <div className="mt-3">
         <Notice notice={notice} />
       </div>
@@ -288,8 +348,10 @@ function WhatsAppCard({ wa, onChanged }: { wa: WhatsAppOverview; onChanged: () =
             ))}
           </ol>
           <p className="mt-3 text-[11px] text-slate-400">
-            The full list of what to get from Meta is in docs/whatsapp-plan.md. Credentials are entered only here and stored
-            encrypted — never send them by chat or email.
+            {ultra
+              ? 'Customers get order updates after they send START to the linked number; shops get new-order alerts unless they send STOP. '
+              : 'The full list of what to get from Meta is in docs/whatsapp-plan.md. '}
+            Credentials are entered only here and stored encrypted — never send them by chat or email.
           </p>
         </div>
 
@@ -305,7 +367,7 @@ function WhatsAppCard({ wa, onChanged }: { wa: WhatsAppOverview; onChanged: () =
         )}
       </div>
 
-      {wa.ready && <TestSend />}
+      {wa.ready && <TestSend anyTemplate={ultra} />}
 
       {configuring && wa.platform && (
         <PlatformConfigModal platform={wa.platform} onClose={() => setConfiguring(false)} onChanged={onChanged} />
@@ -323,9 +385,12 @@ function Mini({ label, value, alert = false }: { label: string; value: number; a
   );
 }
 
-function TestSend() {
-  const { data } = useApiData<WhatsAppTemplatesResponse>('/api/admin/whatsapp/templates?status=approved');
-  const approved = data?.items ?? [];
+/** anyTemplate: UltraMsg sends any template's text, so drafts can be tried too. */
+function TestSend({ anyTemplate = false }: { anyTemplate?: boolean }) {
+  const { data } = useApiData<WhatsAppTemplatesResponse>(
+    anyTemplate ? '/api/admin/whatsapp/templates' : '/api/admin/whatsapp/templates?status=approved',
+  );
+  const approved = (data?.items ?? []).filter((t) => t.status !== 'disabled');
   const [to, setTo] = useState('');
   const [mode, setMode] = useState<'template' | 'text'>('template');
   const [templateId, setTemplateId] = useState<number | ''>('');
@@ -382,7 +447,9 @@ function TestSend() {
         </div>
       </div>
       <p className="text-[11px] text-slate-500">
-        {mode === 'template'
+        {anyTemplate
+          ? 'UltraMsg sends the template’s text (or your text) as a normal WhatsApp message to any number.'
+          : mode === 'template'
           ? 'With Meta’s test number, only numbers added as test recipients in the Meta app receive it. hello_world is approved on every new account — Sync templates to bring it in.'
           : 'Free text reaches someone only within 24 hours of their last message to you.'}
       </p>
@@ -399,7 +466,9 @@ function TestSend() {
               onChange={(e) => pick(e.target.value ? Number(e.target.value) : '')}
               className={inputClass}
             >
-              <option value="">{approved.length ? 'Pick an approved template' : 'No approved template yet'}</option>
+              <option value="">
+                {approved.length ? (anyTemplate ? 'Pick a template' : 'Pick an approved template') : 'No approved template yet'}
+              </option>
               {approved.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name} ({t.language})
@@ -1083,8 +1152,9 @@ function RulesTab() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-500">
-        Sent to the WhatsApp number the customer ordered from, once per event, only if they’ve opted in. Events older
-        than {data?.maxAgeHours ?? 6} hours are never sent.
+        Sent to the WhatsApp number the customer ordered from, once per event, only if they’ve opted in. Shop alerts go to
+        the shop owner’s phone. Events older than {data?.maxAgeHours ?? 6} hours are never sent.
+        {data?.provider === 'ultramsg' && ' Sending through UltraMsg: each template’s text is sent as it is, approved or not.'}
       </p>
       {data && (!data.connected || !data.platformActive) && (
         <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-800">
@@ -1103,7 +1173,14 @@ function RulesTab() {
             <div key={r.event} className="card p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-ink">{r.label}</h3>
+                  <h3 className="text-sm font-bold text-ink">
+                    {r.label}
+                    {r.audience === 'shop' && (
+                      <span className="ml-2 align-middle">
+                        <Badge tone="border-sky-200 bg-sky-50 text-sky-700">To shop</Badge>
+                      </span>
+                    )}
+                  </h3>
                   <p className="text-[12px] text-slate-500">{r.description}</p>
                 </div>
                 <button

@@ -2189,7 +2189,25 @@ export interface ChannelEntry {
   status: 'available' | 'built_in' | 'coming_soon';
 }
 
+export type WhatsAppProviderKey = 'whatsapp_cloud' | 'ultramsg';
+
+export interface WhatsAppProvider {
+  key: WhatsAppProviderKey;
+  label: string;
+  /** Meta sends approved templates only; UltraMsg sends any text. */
+  needsApproval: boolean;
+  inUse: boolean;
+  setUp: boolean;
+  connectionStatus: 'not_connected' | 'connected' | 'error' | null;
+  platformStatus: string | null;
+}
+
 export interface WhatsAppOverview {
+  /** Who sends WhatsApp messages now. Missing on an older backend: Meta. */
+  provider?: WhatsAppProviderKey;
+  providers?: WhatsAppProvider[];
+  needsApproval?: boolean;
+  /** The provider in use has its platform made. */
   setUp: boolean;
   platform: Platform | null;
   /** Settings saved and the connection test passed for the environment in use. */
@@ -2602,6 +2620,8 @@ export interface WhatsAppRule {
   event: string;
   label: string;
   description: string;
+  /** Who gets it: the customer, or the shop owner. */
+  audience?: 'customer' | 'shop';
   /** What the event fills {{1}}, {{2}}… with, in order. */
   variables: string[];
   enabled: boolean;
@@ -2622,6 +2642,7 @@ export interface WhatsAppRulesResponse {
   connected: boolean;
   platformActive: boolean;
   maxAgeHours: number;
+  provider?: WhatsAppProviderKey;
 }
 
 /** A service key the Gloaro WhatsApp bot uses to place orders for customers. */
