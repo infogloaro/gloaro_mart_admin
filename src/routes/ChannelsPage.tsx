@@ -1152,9 +1152,11 @@ function RulesTab() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-500">
-        Sent to the WhatsApp number the customer ordered from, once per event, only if they’ve opted in. Shop alerts go to
-        the shop owner’s phone. Events older than {data?.maxAgeHours ?? 6} hours are never sent.
-        {data?.provider === 'ultramsg' && ' Sending through UltraMsg: each template’s text is sent as it is, approved or not.'}
+        Sent to the WhatsApp number the customer ordered from, once per event, only if they’ve opted in — and to the mobile
+        number on the delivery address unless it wrote STOP. Shop alerts go to the shop owner’s phone. Events older than{' '}
+        {data?.maxAgeHours ?? 6} hours are never sent.
+        {data?.provider === 'ultramsg' &&
+          ' Sending through UltraMsg: each template’s text is sent as it is, approved or not; Order placed adds the itemised bill and Invoice ready attaches the PDF.'}
       </p>
       {data && (!data.connected || !data.platformActive) && (
         <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-800">
