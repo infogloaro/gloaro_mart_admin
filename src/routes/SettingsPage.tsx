@@ -6,7 +6,23 @@ import { Icon } from '../components/ui/Icon';
 import { ImageUpload } from '../components/ui/ImageUpload';
 import { clearToken } from '../lib/auth';
 import { notifyBrandChanged } from '../lib/brand';
-import type { PlatformSettings } from '../lib/types';
+import type { HomeChip, PlatformSettings } from '../lib/types';
+
+// The quick chips under the app's home search bar, in the order the app shows them.
+const HOME_CHIPS: { key: HomeChip; label: string }[] = [
+  { key: 'mart', label: 'Mart' },
+  { key: 'categories', label: 'Categories' },
+  { key: 'deals', label: 'Deals' },
+  { key: 'b2b', label: 'B2B' },
+  { key: 'near_me', label: 'Near Me' },
+];
+
+type ChipImages = Record<HomeChip, string>;
+
+function toChipImages(s: PlatformSettings): ChipImages {
+  const saved = s.home_chip_images ?? {};
+  return Object.fromEntries(HOME_CHIPS.map(({ key }) => [key, saved[key] ?? ''])) as ChipImages;
+}
 
 /** Form state is all strings — inputs give strings, and the API takes nulls for blanks. */
 type Draft = {
@@ -252,6 +268,7 @@ export default function SettingsPage() {
   const { data: settings, loading, error, reload } = useApiData<PlatformSettings>('/api/admin/settings');
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [chipImages, setChipImages] = useState<ChipImages | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -260,6 +277,7 @@ export default function SettingsPage() {
     if (!settings) return;
     setDraft(toDraft(settings));
     setMaintenanceMode(settings.maintenance_mode);
+    setChipImages(toChipImages(settings));
   }, [settings]);
 
   const set = (key: keyof Draft) => (value: string) => setDraft((d) => ({ ...d, [key]: value }));
@@ -284,6 +302,8 @@ export default function SettingsPage() {
     body.platformName = draft.platformName.trim();
     body.currencyCode = draft.currencyCode.trim().toUpperCase();
     body.invoicePrefix = draft.invoicePrefix.trim().toUpperCase();
+    // Sent only once loaded, so a save can't wipe pictures it never showed.
+    if (chipImages) body.homeChipImages = chipImages;
 
     setSaving(true);
     try {
@@ -349,6 +369,25 @@ export default function SettingsPage() {
             placeholder="https://…/favicon.png"
             small
           />
+        </div>
+      </Section>
+
+      <Section
+        title="Home chips"
+        hint="The picture on each quick chip under the app's home search bar. Square images work best; a chip with no picture shows the one built into the app."
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          {HOME_CHIPS.map(({ key, label }) => (
+            <ImageUpload
+              key={key}
+              label={label}
+              area="settings"
+              value={chipImages?.[key] ?? ''}
+              onChange={(v) => setChipImages((c) => (c ? { ...c, [key]: v } : c))}
+              placeholder="/uploads/settings/…png"
+              small
+            />
+          ))}
         </div>
       </Section>
 
@@ -460,6 +499,7 @@ export default function SettingsPage() {
               if (!settings) return;
               setDraft(toDraft(settings));
               setMaintenanceMode(settings.maintenance_mode);
+              setChipImages(toChipImages(settings));
               setSaveError(null);
               setNotice(null);
             }}

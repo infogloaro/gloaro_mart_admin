@@ -33,6 +33,9 @@ export interface AdminVendor {
   created_at: string;
   email: string;
   full_name: string;
+  /** Shop page pictures (SB1), /uploads/vendors/... paths. */
+  logo_url?: string | null;
+  cover_image_url?: string | null;
 }
 
 export interface AdminProduct {
@@ -97,8 +100,12 @@ export interface PlatformSettings {
   youtube_url: string | null;
   maintenance_mode: boolean;
   maintenance_message: string | null;
+  /** Home quick chip → uploaded picture (HC1); a chip left out uses the app's own. */
+  home_chip_images: Partial<Record<HomeChip, string>> | null;
   updated_at: string;
 }
+
+export type HomeChip = 'deals' | 'b2b' | 'near_me' | 'mart' | 'categories';
 
 export interface Brand {
   id: number;

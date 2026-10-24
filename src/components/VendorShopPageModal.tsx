@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, ApiError, assetUrl } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
 import { Modal } from './ui/Modal';
+import { ImageUpload } from './ui/ImageUpload';
 import type { AdminVendor } from '../lib/types';
 
 /** One photo in a shop's gallery (GET /api/admin/vendors/:id/gallery, SB1). */
@@ -25,8 +26,8 @@ type BrandedVendor = AdminVendor & {
 /**
  * Vendors → Shop page: what customers see on this shop's page — its
  * description, logo, cover and photo gallery — with the admin's corrections:
- * fix the words, remove a bad logo or cover, hide a photo (the shop sees the
- * reason) or show it again. The shop uploads its own pictures in the app.
+ * fix the words, upload or remove the logo and cover, hide a photo (the shop
+ * sees the reason) or show it again. The shop uploads its own pictures in the app.
  */
 export function VendorShopPageModal({
   vendor,
@@ -97,24 +98,24 @@ export function VendorShopPageModal({
     }
   }
 
-  const picture = (label: string, value: string | null, clear: () => void, wide: boolean) => (
-    <div>
-      <div className="mb-1 text-sm font-medium text-slate-700">{label}</div>
+  // An admin can upload a logo or cover for the shop as well as remove one;
+  // uploads land under /uploads/vendors, the only place the server accepts.
+  const picture = (label: string, value: string | null, set: (v: string | null) => void, wide: boolean) => (
+    <div className="space-y-2">
+      {canEdit ? (
+        <ImageUpload label={label} area="vendors" value={value ?? ''} onChange={(v) => set(v.trim() || null)} small={!wide} />
+      ) : (
+        <div className="text-sm font-medium text-slate-700">{label}</div>
+      )}
       {value ? (
-        <div className="space-y-2">
-          <img
-            src={assetUrl(value)}
-            alt={label}
-            className={`${wide ? 'aspect-[3/1] w-full' : 'h-20 w-20'} rounded-lg border border-slate-200 object-cover`}
-          />
-          {canEdit && (
-            <button type="button" onClick={clear} className="text-xs font-medium text-rose-600 hover:underline">
-              Remove {label.toLowerCase()}
-            </button>
-          )}
-        </div>
+        wide && (
+          <img src={assetUrl(value)} alt={label} className="aspect-[16/9] w-full rounded-lg border border-slate-200 object-cover" />
+        )
       ) : (
         <div className="text-xs text-slate-400">None set — the app shows the shop's initial{wide ? ' and no cover' : ''}.</div>
+      )}
+      {!canEdit && value && !wide && (
+        <img src={assetUrl(value)} alt={label} className="h-20 w-20 rounded-lg border border-slate-200 object-cover" />
       )}
     </div>
   );
@@ -124,7 +125,7 @@ export function VendorShopPageModal({
       <div className="space-y-5">
         <p className="text-xs text-slate-500">
           What customers see on this shop's page. The shop uploads its own pictures in the vendor app; here you can
-          correct the words, remove a bad logo or cover, and hide a photo.
+          correct the words, upload or remove the logo and cover, and hide a photo.
         </p>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
@@ -139,9 +140,9 @@ export function VendorShopPageModal({
           />
           <div className="text-right text-xs text-slate-400">{description.trim().length} / 1000</div>
         </div>
-        <div className="grid grid-cols-[auto,1fr] gap-5">
-          {picture('Logo', logo, () => setLogo(null), false)}
-          {picture('Cover', cover, () => setCover(null), true)}
+        <div className="grid gap-5 sm:grid-cols-2">
+          {picture('Logo', logo, setLogo, false)}
+          {picture('Cover', cover, setCover, true)}
         </div>
         {canEdit && (
           <div className="flex justify-end">

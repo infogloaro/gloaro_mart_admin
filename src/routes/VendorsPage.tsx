@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, assetUrl } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
 import { DataTable } from '../components/ui/DataTable';
 import { StatusBadge } from '../components/ui/StatusBadge';
@@ -61,7 +61,24 @@ export default function VendorsPage() {
         <div className="overflow-hidden card">
           <DataTable
             columns={[
-              { header: 'Business', render: (v) => <span className="font-medium">{v.business_name}</span> },
+              {
+                header: 'Business',
+                render: (v) => (
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-sm font-bold text-slate-400">
+                      {v.logo_url ? <img src={assetUrl(v.logo_url)} alt="" className="h-full w-full object-cover" /> : v.business_name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-medium">{v.business_name}</div>
+                      {(!v.logo_url || !v.cover_image_url) && (
+                        <div className="text-xs text-amber-700">
+                          {[!v.logo_url && 'No logo', !v.cover_image_url && 'No cover'].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ),
+              },
               { header: 'Owner', render: (v) => `${v.full_name} · ${v.email}` },
               {
                 header: 'Location',
