@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { api, ApiError, isMissingEndpoint } from '../lib/api';
+import { api, ApiError, isMissingEndpoint, isPendingApproval } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
 import { useDebounced } from '../lib/useDebounced';
 import { DataTable } from '../components/ui/DataTable';
@@ -221,20 +221,41 @@ function WhatsAppCard({ wa, onChanged }: { wa: WhatsAppOverview; onChanged: () =
     }
   }
 
+  /** Active = automatic messages go out and the webhook is accepted (same switch as Platform Registry → Enable). */
+  async function setActive(active: boolean) {
+    if (!wa.platform) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      const r = await api.patch(`/api/admin/platforms/${wa.platform.id}`, { status: active ? 'active' : 'inactive' });
+      onChanged();
+      setNotice(
+        isPendingApproval(r)
+          ? { tone: 'ok', text: r.message }
+          : { tone: 'ok', text: active ? 'WhatsApp is on — order updates now go out.' : 'WhatsApp is off — nothing automatic is sent.' },
+      );
+    } catch (err) {
+      setNotice({ tone: 'error', text: err instanceof ApiError ? err.message : 'Could not change the status.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const provider: WhatsAppProviderKey = wa.provider ?? 'whatsapp_cloud';
   const ultra = provider === 'ultramsg';
+  const active = wa.platform?.status === 'active';
   const steps = ultra
     ? [
         { done: wa.setUp && Boolean(wa.platform?.setup_complete), text: 'Scan the QR code in the UltraMsg dashboard, then enter the instance ID and token' },
         { done: wa.connectionStatus === 'connected', text: 'Test the connection (Configure → Settings → Test)' },
-        { done: wa.platform?.status === 'active', text: 'Set the platform Active in Configure, so messages go out and the webhook is accepted' },
-        { done: false, text: 'In UltraMsg, set the webhook URL to …/api/webhooks/platforms/whatsapp_ultramsg?secret=<webhook secret>, with “message received” and “message ack” on — so START / STOP work' },
+        { done: active, text: 'Turn it on (the On / Off button above), so messages go out and the webhook is accepted' },
+        { done: false, text: 'In UltraMsg, set the webhook URL (Configure shows it) with ?secret=<webhook secret> at the end, and “message received” and “message ack” on — so START / STOP work' },
       ]
     : [
         { done: wa.setUp && Boolean(wa.platform?.setup_complete), text: 'Enter the phone number ID, business account ID, access token and app secret' },
         { done: wa.connectionStatus === 'connected', text: 'Test the connection (Configure → Settings → Test)' },
         { done: (wa.templates?.approved ?? 0) > 0, text: 'Submit templates to Meta, or Sync to bring in approved ones' },
-        { done: wa.platform?.status === 'active', text: 'Set the platform Active in Configure, so Meta’s webhook is accepted' },
+        { done: active, text: 'Turn it on (the On / Off button above), so Meta’s webhook is accepted' },
       ];
 
   return (
@@ -275,6 +296,20 @@ function WhatsAppCard({ wa, onChanged }: { wa: WhatsAppOverview; onChanged: () =
                 {wa.environment === 'live' ? 'Live' : 'Test'}
               </Badge>
             </>
+          )}
+          {wa.setUp && wa.platform && (
+            <button
+              onClick={() => setActive(!active)}
+              disabled={busy || (!active && wa.connectionStatus !== 'connected')}
+              title={!active && wa.connectionStatus !== 'connected' ? 'Test the connection first' : undefined}
+              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+                active
+                  ? 'border border-slate-200 text-slate-600 hover:bg-slate-50'
+                  : 'border border-state-success/30 bg-state-success/10 text-state-success-ink hover:bg-state-success/20'
+              }`}
+            >
+              {active ? 'On · turn off' : 'Off · turn on'}
+            </button>
           )}
           {wa.setUp && wa.platform ? (
             <button
@@ -349,7 +384,7 @@ function WhatsAppCard({ wa, onChanged }: { wa: WhatsAppOverview; onChanged: () =
           </ol>
           <p className="mt-3 text-[11px] text-slate-400">
             {ultra
-              ? 'Customers get order updates after they send START to the linked number; shops get new-order alerts unless they send STOP. '
+              ? 'Customers get order updates on the delivery address’s mobile number (and their account number once they send START); shops get new-order alerts. Anyone who sends STOP gets nothing more. '
               : 'The full list of what to get from Meta is in docs/whatsapp-plan.md. '}
             Credentials are entered only here and stored encrypted — never send them by chat or email.
           </p>
