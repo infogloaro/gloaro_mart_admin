@@ -13,6 +13,7 @@ import ProductsPage from './routes/ProductsPage';
 import CategoriesPage from './routes/CategoriesPage';
 import BrandsPage from './routes/BrandsPage';
 import SettingsPage from './routes/SettingsPage';
+import LanguagesPage from './routes/LanguagesPage';
 import OrganizationPage from './routes/OrganizationPage';
 import ReferralsPage from './routes/ReferralsPage';
 import WalletsPage from './routes/WalletsPage';
@@ -84,6 +85,7 @@ export default function App() {
             <Route path="/categories" element={<CategoriesPage />} />
             <Route path="/brands" element={<BrandsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/languages" element={<LanguagesPage />} />
             <Route path="/organisation" element={<OrganizationPage />} />
             <Route path="/referrals" element={<ReferralsPage />} />
             <Route path="/wallets" element={<WalletsPage />} />

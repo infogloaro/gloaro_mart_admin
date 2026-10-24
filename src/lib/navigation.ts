@@ -365,6 +365,13 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: "settings",
         status: "live", permission: "settings.view" },
       {
+        to: "/languages",
+        label: "App Languages",
+        icon: "globe",
+        status: "live",
+        permission: "settings.view",
+      },
+      {
         to: "/channels",
         label: "Channels",
         icon: "chat",

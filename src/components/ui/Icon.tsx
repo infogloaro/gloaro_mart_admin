@@ -62,6 +62,7 @@ const PATHS = {
   x: 'M6 6l12 12M18 6 6 18',
   alert: 'M12 3 1.8 20.5h20.4L12 3Zm0 6v5m0 3.2h.01',
   chat: 'M4 5h16v11H9l-5 4V5Zm4 4.5h8m-8 3.5h5',
+  globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-9-9h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3Z',
   download: 'M12 4v11m0 0 4-4m-4 4-4-4M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2',
   calendar: 'M4 6h16v14H4zM4 10h16M8.5 3v4m7-4v4',
   /* Sidebar collapse — a rail beside the page. */
