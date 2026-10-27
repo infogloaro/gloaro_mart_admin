@@ -573,9 +573,17 @@ export interface AttributeValueOption {
   id: number;
   value: string;
   sortOrder?: number;
+  /** "#RRGGBB" for swatch attributes (Colour, Shade). */
+  colorHex?: string | null;
 }
 
-/** An attribute definition plus the values a variant may take from it. */
+export type FilterKind = 'chips' | 'swatch' | 'range' | 'toggle';
+
+/**
+ * An attribute definition plus the values a variant (or a product) may take
+ * from it. Since F3 it is also a filter definition for the customer app:
+ * is_filter / filter_kind / unit / subcategories.
+ */
 export interface ProductAttribute {
   id: number;
   name: string;
@@ -586,6 +594,11 @@ export interface ProductAttribute {
   category_id: number | null;
   category_name: string | null;
   is_active: boolean;
+  is_filter?: boolean;
+  filter_kind?: FilterKind;
+  unit?: string | null;
+  /** Only offered once one of these sub-categories is chosen; null = whole category. */
+  subcategories?: string[] | null;
   values: AttributeValueOption[];
 }
 

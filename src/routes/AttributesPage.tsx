@@ -6,7 +6,7 @@ import { Modal } from '../components/ui/Modal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { PendingApiNotice } from '../components/ui/PendingApiNotice';
 import { useCan } from '../lib/staffContext';
-import type { AttributeValueOption, Category, ProductAttribute } from '../lib/types';
+import type { AttributeValueOption, Category, FilterKind, ProductAttribute } from '../lib/types';
 
 const ENDPOINTS = [
   'GET    /api/admin/attributes',
@@ -20,6 +20,14 @@ const ENDPOINTS = [
 
 const INPUT_TYPES = ['select', 'text', 'number'] as const;
 type InputType = (typeof INPUT_TYPES)[number];
+
+/** How the customer app draws the filter group. */
+const FILTER_KINDS: { value: FilterKind; label: string }[] = [
+  { value: 'chips', label: 'Chips (Size S · M · L)' },
+  { value: 'swatch', label: 'Colour swatches' },
+  { value: 'range', label: 'Range with a unit (Screen size, inch)' },
+  { value: 'toggle', label: 'On / off (one value, e.g. Organic)' },
+];
 
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-sm';
 const labelClass = 'mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase';
@@ -56,9 +64,16 @@ export default function AttributesPage() {
   const [inputType, setInputType] = useState<InputType>('select');
   const [isVariantDefining, setIsVariantDefining] = useState(true);
   const [isActive, setIsActive] = useState(true);
+  // Filter definition (F3): shown in the app's Filters page, how, with which
+  // unit, and for which sub-categories only.
+  const [isFilter, setIsFilter] = useState(true);
+  const [filterKind, setFilterKind] = useState<FilterKind>('chips');
+  const [unit, setUnit] = useState('');
+  const [subcategories, setSubcategories] = useState('');
 
   // Inline "add value" state, keyed by attribute so two rows do not share a box.
   const [newValues, setNewValues] = useState<Record<number, string>>({});
+  const [newColors, setNewColors] = useState<Record<number, string>>({});
 
   function resetForm() {
     setName('');
@@ -67,7 +82,21 @@ export default function AttributesPage() {
     setInputType('select');
     setIsVariantDefining(true);
     setIsActive(true);
+    setIsFilter(true);
+    setFilterKind('chips');
+    setUnit('');
+    setSubcategories('');
     setActionError(null);
+  }
+
+  /** The filter fields as the API takes them ("" clears unit / subcategories). */
+  function filterFields() {
+    return {
+      isFilter,
+      filterKind,
+      unit: unit.trim(),
+      subcategories: subcategories.split(',').map((s) => s.trim()).filter(Boolean),
+    };
   }
 
   async function createAttribute(e: FormEvent) {
@@ -87,6 +116,7 @@ export default function AttributesPage() {
         categoryId: categoryId ? Number(categoryId) : undefined,
         inputType,
         isVariantDefining,
+        ...filterFields(),
       });
       setCreating(false);
       resetForm();
@@ -110,6 +140,7 @@ export default function AttributesPage() {
         inputType,
         isVariantDefining,
         isActive,
+        ...filterFields(),
       });
       setEditing(null);
       reload();
@@ -139,10 +170,15 @@ export default function AttributesPage() {
   async function addValue(attr: ProductAttribute) {
     const value = (newValues[attr.id] ?? '').trim();
     if (!value) return;
+    const colorHex = (newColors[attr.id] ?? '').trim();
     setActionError(null);
     try {
-      await api.post(`/api/admin/attributes/${attr.id}/values`, { value });
+      await api.post(`/api/admin/attributes/${attr.id}/values`, {
+        value,
+        ...(attr.filter_kind === 'swatch' && colorHex ? { colorHex } : {}),
+      });
       setNewValues((prev) => ({ ...prev, [attr.id]: '' }));
+      setNewColors((prev) => ({ ...prev, [attr.id]: '' }));
       reload();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : 'Could not add the value.');
@@ -171,7 +207,56 @@ export default function AttributesPage() {
     setInputType((attr.input_type as InputType) ?? 'select');
     setIsVariantDefining(attr.is_variant_defining);
     setIsActive(attr.is_active);
+    setIsFilter(attr.is_filter !== false);
+    setFilterKind(attr.filter_kind ?? 'chips');
+    setUnit(attr.unit ?? '');
+    setSubcategories((attr.subcategories ?? []).join(', '));
     setActionError(null);
+  }
+
+  /** The filter settings, shared by the create and edit forms. */
+  function filterSettings() {
+    return (
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+        <label className="flex items-start gap-2 text-sm text-slate-600">
+          <input type="checkbox" checked={isFilter} onChange={(e) => setIsFilter(e.target.checked)} className="mt-1" />
+          <span>
+            Customers can filter by it
+            <span className="block text-xs text-slate-400">
+              Shown on the app's Filters page whenever products in the results carry one of its values.
+            </span>
+          </span>
+        </label>
+
+        <label className="block">
+          <span className={labelClass}>Shown as</span>
+          <select value={filterKind} onChange={(e) => setFilterKind(e.target.value as FilterKind)} className={inputClass}>
+            {FILTER_KINDS.map((k) => (
+              <option key={k.value} value={k.value}>{k.label}</option>
+            ))}
+          </select>
+        </label>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className={labelClass}>Unit (optional)</span>
+            <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="GB, inch, ml" className={inputClass} />
+          </label>
+          <label className="block">
+            <span className={labelClass}>Only for sub-categories (optional)</span>
+            <input
+              value={subcategories}
+              onChange={(e) => setSubcategories(e.target.value)}
+              placeholder="Men, Women, Kids"
+              className={inputClass}
+            />
+            <span className="mt-1 block text-[11px] text-slate-400">
+              Comma-separated. Empty = the whole category. Sleeve → Men, Women; Shoe size → Footwear.
+            </span>
+          </label>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -245,6 +330,10 @@ export default function AttributesPage() {
               </div>
               <p className="mt-1 text-xs text-slate-400">
                 {attr.category_name ? `${attr.category_name} only` : 'Every category'} · {attr.input_type}
+                {attr.is_filter === false
+                  ? ' · not a filter'
+                  : ` · filter: ${attr.filter_kind ?? 'chips'}${attr.unit ? ` (${attr.unit})` : ''}`}
+                {attr.subcategories?.length ? ` · only for ${attr.subcategories.join(', ')}` : ''}
               </p>
             </div>
             <div className="flex gap-2">
@@ -278,6 +367,13 @@ export default function AttributesPage() {
                 key={v.id}
                 className="group inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700"
               >
+                {attr.filter_kind === 'swatch' && (
+                  <span
+                    title={v.colorHex ?? 'no swatch colour'}
+                    className="inline-block h-3 w-3 rounded-full border border-slate-300"
+                    style={{ background: v.colorHex ?? 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' }}
+                  />
+                )}
                 {v.value}
                 {can.delete && (
                   <button
@@ -306,6 +402,15 @@ export default function AttributesPage() {
                 placeholder="Add a value, e.g. 500g"
                 className="w-56 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs"
               />
+              {attr.filter_kind === 'swatch' && (
+                <input
+                  value={newColors[attr.id] ?? ''}
+                  onChange={(e) => setNewColors((prev) => ({ ...prev, [attr.id]: e.target.value }))}
+                  placeholder="#RRGGBB"
+                  title="Swatch colour, e.g. #D32F2F (leave empty for a rainbow 'Multicolour')"
+                  className="w-28 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 font-mono text-xs"
+                />
+              )}
               <button
                 type="submit"
                 className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:border-emerald hover:bg-mint-mist hover:text-emerald-deep"
@@ -380,6 +485,8 @@ export default function AttributesPage() {
               </span>
             </label>
 
+            {filterSettings()}
+
             {actionError && <p className="text-sm font-medium text-rose-700">{actionError}</p>}
 
             <div className="flex justify-end gap-2 pt-1">
@@ -446,6 +553,8 @@ export default function AttributesPage() {
               <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
               Active
             </label>
+
+            {filterSettings()}
 
             {actionError && <p className="text-sm font-medium text-rose-700">{actionError}</p>}
 
