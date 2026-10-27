@@ -2097,6 +2097,8 @@ export interface AdminCampaign {
   revenueCents: number;
   discountGivenCents: number;
   bannerUrl: string | null;
+  /** YouTube link the shopper app plays on the Offers page (OF9). */
+  videoUrl: string | null;
   createdAt: string;
 }
 

@@ -3,6 +3,7 @@ import { api, ApiError, isMissingEndpoint } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
 import { useDebounced } from '../lib/useDebounced';
 import { Icon } from '../components/ui/Icon';
+import { ImageUpload } from '../components/ui/ImageUpload';
 import { Modal } from '../components/ui/Modal';
 import { Pagination } from '../components/ui/Pagination';
 import { StatCard } from '../components/ui/StatCard';
@@ -451,6 +452,23 @@ function CampaignModal({
     }
   }
 
+  /** Poster and video for the shopper app (OF9); true when saved. */
+  async function saveMedia(body: { bannerUrl: string | null; videoUrl: string | null }) {
+    onError(null);
+    setBusy(true);
+    try {
+      await api.patch(`/api/admin/campaigns/${id}`, body);
+      reload();
+      onChanged();
+      return true;
+    } catch (err) {
+      onError(err instanceof ApiError ? err.message : 'Could not save the poster and video.');
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const use = data ? budgetUse(data) : null;
   const roi = data ? returnPerRupee(data) : null;
 
@@ -596,6 +614,15 @@ function CampaignModal({
             )}
           </div>
 
+          {data.status !== 'ended' && (
+            <CampaignMedia
+              key={`${data.id}-${data.bannerUrl ?? ''}-${data.videoUrl ?? ''}`}
+              campaign={data}
+              disabled={busy}
+              onSave={saveMedia}
+            />
+          )}
+
           {editing ? (
             <form onSubmit={saveEdits} className="space-y-2.5 rounded-xl border border-slate-200 p-4">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -686,6 +713,89 @@ function CampaignModal({
         </div>
       )}
     </Modal>
+  );
+}
+
+/* ------------------------------------------------------------ shopper app */
+
+/** The 11-character id of a YouTube watch, youtu.be, Shorts or embed link (as the server checks it). */
+function youtubeId(url: string): string | null {
+  const m = url
+    .trim()
+    .match(/^https:\/\/(?:(?:www\.|m\.)?youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{11})(?:[?&#]\S*)?$/);
+  return m ? m[1] : null;
+}
+
+/**
+ * OF9: what the shopper app's Offers page shows for this campaign while it
+ * runs — its poster in the festival carousel and a YouTube video under it.
+ */
+function CampaignMedia({
+  campaign,
+  disabled,
+  onSave,
+}: {
+  campaign: CampaignDetail;
+  disabled: boolean;
+  onSave: (body: { bannerUrl: string | null; videoUrl: string | null }) => Promise<boolean>;
+}) {
+  const [poster, setPoster] = useState(campaign.bannerUrl ?? '');
+  const [video, setVideo] = useState(campaign.videoUrl ?? '');
+  const videoId = youtubeId(video);
+  const changed = poster.trim() !== (campaign.bannerUrl ?? '') || video.trim() !== (campaign.videoUrl ?? '');
+  const badVideo = video.trim() !== '' && !videoId;
+
+  return (
+    <section className="space-y-3 rounded-xl border border-slate-200 p-4">
+      <div>
+        <h3 className="text-[11px] font-bold tracking-wide text-slate-500 uppercase">Shopper app — poster &amp; video</h3>
+        <p className="mt-1 text-[11px] text-slate-500">
+          While it runs, the app&rsquo;s Offers page shows the poster in its festival carousel and plays the video
+          under it. Both are optional.
+        </p>
+      </div>
+      <ImageUpload
+        label="Poster — landscape, about 16:9 (e.g. 1600 × 900)"
+        area="campaigns"
+        value={poster}
+        onChange={setPoster}
+      />
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium text-slate-700">YouTube video</span>
+        <input
+          value={video}
+          onChange={(e) => setVideo(e.target.value)}
+          placeholder="https://youtu.be/…  or  https://youtube.com/shorts/…"
+          className={inputClass}
+        />
+        <span className={`mt-1 block text-xs ${badVideo ? 'text-rose-600' : 'text-slate-400'}`}>
+          {badVideo
+            ? 'Paste a YouTube link: youtube.com/watch?v=…, youtu.be/… or youtube.com/shorts/…'
+            : 'Public or unlisted YouTube videos and Shorts. Nothing is uploaded here.'}
+        </span>
+      </label>
+      {videoId && (
+        <a
+          href={`https://youtu.be/${videoId}`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-3 rounded-xl border border-slate-200 p-2 hover:bg-slate-50"
+        >
+          <img src={`https://img.youtube.com/vi/${videoId}/mqdefault.jpg`} alt="" className="h-14 w-24 rounded-lg object-cover" />
+          <span className="text-xs font-semibold text-emerald-deep">Open the video on YouTube to check it</span>
+        </a>
+      )}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          disabled={disabled || !changed || badVideo}
+          onClick={() => onSave({ bannerUrl: poster.trim() || null, videoUrl: video.trim() || null })}
+          className="rounded-lg bg-emerald px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-deep disabled:opacity-45"
+        >
+          Save poster &amp; video
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -853,7 +963,8 @@ function CreateModal({
         </div>
 
         <p className="text-xs text-slate-400">
-          It is created as a draft with nothing taking part. Add the shops or categories, then start it.
+          It is created as a draft with nothing taking part. Add the shops or categories, then start it. Its poster
+          and video for the shopper app are added on the campaign once it is created.
         </p>
 
         <div className="flex justify-end gap-2 pt-1">
