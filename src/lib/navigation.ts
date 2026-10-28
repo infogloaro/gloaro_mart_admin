@@ -61,6 +61,11 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Categories",
         icon: "layers",
         status: "live", permission: "categories.view" },
+      {
+        to: "/service-categories",
+        label: "Service categories",
+        icon: "layers",
+        status: "live", permission: "categories.view" },
       { to: "/brands", label: "Brands", icon: "tag", status: "live", permission: "brands.view" },
       {
         to: "/attributes",

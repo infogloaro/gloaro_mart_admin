@@ -117,7 +117,8 @@ export type UploadArea =
   | 'platforms'
   | 'delivery-partners'
   | 'ads'
-  | 'campaigns';
+  | 'campaigns'
+  | 'service-categories';
 
 /**
  * Uploads one image and returns the server path to store, e.g.

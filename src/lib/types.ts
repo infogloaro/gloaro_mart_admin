@@ -79,6 +79,42 @@ export interface Category {
   created_at: string;
 }
 
+/** Admin → Service categories (NS4): a kind of service on Near Me → Services. */
+export interface ServiceCategory {
+  id: number;
+  slug: string;
+  name: string;
+  name_ta: string | null;
+  name_hi: string | null;
+  group_key: string;
+  icon_key: string;
+  image_url: string | null;
+  sort_order: number;
+  is_active: boolean;
+  service_count: number;
+  provider_count: number;
+}
+
+/** A service a shop offers, as Admin → Service categories → Services lists it. */
+export interface AdminService {
+  id: number;
+  title: string;
+  price_type: 'fixed' | 'from' | 'range' | 'per_hour' | 'on_request';
+  price_cents: number | null;
+  price_max_cents: number | null;
+  visit_fee_cents: number | null;
+  at_home: boolean;
+  at_shop: boolean;
+  status: 'active' | 'paused' | 'hidden';
+  hidden_reason: string | null;
+  category_id: number;
+  category_name: string;
+  vendor_id: number;
+  vendor_name: string;
+  vendor_city: string | null;
+  updated_at: string;
+}
+
 export interface PlatformSettings {
   id: number;
   platform_name: string;
