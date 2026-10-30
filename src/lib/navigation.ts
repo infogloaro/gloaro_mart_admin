@@ -33,6 +33,12 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+/**
+ * Sidebar groups, by the task an admin is doing (2026-10-31): day-to-day work
+ * first (orders, delivery, returns), then catalogue and shops, then growth
+ * (offers, app content, ads), then money and settings. Groups start closed;
+ * the one holding the open page expands (see Sidebar).
+ */
 export const NAV_GROUPS: NavGroup[] = [
   {
     id: "overview",
@@ -49,13 +55,130 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Analytics",
         icon: "chart",
         status: "live", permission: "analytics.view" },
+      {
+        to: "/approvals",
+        label: "Approvals",
+        icon: "shield",
+        status: "live",
+        // Open to all staff: each sees their own requests; super admins see and decide all.
+      },
+      {
+        // A personal inbox scoped to the signed-in account, like Settings'
+        // profile tab — every admin sees their own regardless of role, so
+        // this is intentionally not gated by a module permission.
+        to: "/notifications",
+        label: "Notifications",
+        icon: "bell",
+        status: "live",
+      },
     ],
   },
   {
-    id: "catalogue",
-    label: "Catalogue",
+    id: "orders",
+    label: "Orders",
+    items: [
+      { to: "/orders", label: "Orders", icon: "cart", status: "live", permission: "orders.view" },
+      {
+        to: "/control-tower",
+        label: "Order Control Tower",
+        icon: "tower",
+        status: "live", permission: "control_tower.view" },
+      {
+        to: "/vendor-routing",
+        label: "Vendor Matching & Re-routing",
+        icon: "route",
+        status: "live", permission: "vendor_routing.view" },
+      {
+        to: "/cancellations",
+        label: "Cancellations",
+        icon: "ban",
+        status: "live", permission: "cancellations.view" },
+    ],
+  },
+  {
+    id: "delivery",
+    label: "Delivery",
+    items: [
+      {
+        to: "/shipments",
+        label: "Shipments",
+        icon: "truck",
+        status: "live", permission: "shipments.view" },
+      {
+        to: "/delivery-partners",
+        label: "Delivery Partners",
+        icon: "bike",
+        status: "live", permission: "delivery_partners.view" },
+      {
+        to: "/delivery-zones",
+        label: "Delivery Zones & Rules",
+        icon: "mappin",
+        status: "live", permission: "vendors.view" },
+      {
+        to: "/service-areas",
+        label: "Service Areas",
+        icon: "map",
+        status: "live", permission: "vendors.view" },
+    ],
+  },
+  {
+    id: "after-sales",
+    label: "Returns & Support",
+    items: [
+      {
+        to: "/returns",
+        label: "Returns",
+        icon: "undo",
+        status: "live", permission: "returns.view" },
+      {
+        to: "/replacements",
+        label: "Replacements",
+        icon: "swap",
+        status: "live", permission: "replacements.view" },
+      { to: "/refunds", label: "Refunds", icon: "refund", status: "live", permission: "refunds.view" },
+      {
+        to: "/support",
+        label: "Support Tickets",
+        icon: "headset",
+        status: "live", permission: "support.view" },
+      {
+        to: "/reviews",
+        label: "Reviews & Ratings",
+        icon: "star",
+        status: "live", permission: "reviews.view" },
+    ],
+  },
+  {
+    id: "products",
+    label: "Products",
     items: [
       { to: "/products", label: "Products", icon: "box", status: "live", permission: "products.view" },
+      {
+        to: "/variants",
+        label: "Product Variants",
+        icon: "grid",
+        status: "live", permission: "products.view" },
+      {
+        to: "/moderation",
+        label: "Product Moderation",
+        icon: "shield",
+        status: "live", permission: "products.view" },
+      {
+        to: "/inventory",
+        label: "Inventory",
+        icon: "package",
+        status: "live", permission: "inventory.view" },
+      {
+        to: "/catalogue-import",
+        label: "Bulk Import / Export",
+        icon: "upload",
+        status: "live", permission: "catalogue_import.view" },
+    ],
+  },
+  {
+    id: "catalogue-setup",
+    label: "Categories & Brands",
+    items: [
       {
         to: "/categories",
         label: "Categories",
@@ -72,145 +195,47 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Attributes",
         icon: "sliders",
         status: "live", permission: "attributes.view" },
-      {
-        to: "/variants",
-        label: "Product Variants",
-        icon: "grid",
-        status: "live", permission: "products.view" },
-      {
-        to: "/moderation",
-        label: "Product Moderation",
-        icon: "shield",
-        status: "live", permission: "products.view" },
-      {
-        to: "/catalogue-import",
-        label: "Bulk Import / Export",
-        icon: "upload",
-        status: "live", permission: "catalogue_import.view" },
-      {
-        to: "/inventory",
-        label: "Inventory",
-        icon: "package",
-        status: "live", permission: "inventory.view" },
     ],
   },
   {
     id: "vendors",
-    label: "Vendors",
+    label: "Shops (Vendors)",
     items: [
       { to: "/vendors", label: "Vendors", icon: "store", status: "live", permission: "vendors.view", end: true },
-      {
-        to: "/vendors/reports",
-        label: "Shop Reports",
-        icon: "flag",
-        status: "live", permission: "vendors.view" },
       {
         to: "/vendor-kyc",
         label: "KYC & Documents",
         icon: "idcard",
         status: "live", permission: "vendors.view" },
       {
-        to: "/service-areas",
-        label: "Service Areas",
-        icon: "map",
+        to: "/vendor-performance",
+        label: "Vendor Performance",
+        icon: "gauge",
+        status: "live", permission: "vendors.view" },
+      {
+        to: "/vendors/reports",
+        label: "Shop Reports",
+        icon: "flag",
         status: "live", permission: "vendors.view" },
       {
         to: "/commission-plans",
         label: "Commission Plans",
         icon: "percent",
         status: "live", permission: "commission_plans.view" },
-      {
-        to: "/vendor-performance",
-        label: "Vendor Performance",
-        icon: "gauge",
-        status: "live", permission: "vendors.view" },
     ],
   },
   {
-    id: "orders",
-    label: "Orders & Fulfilment",
+    id: "customers",
+    label: "Customers",
     items: [
-      { to: "/orders", label: "Orders", icon: "cart", status: "live", permission: "orders.view" },
+      { to: "/users", label: "Users", icon: "users", status: "live", permission: "users.view" },
+      { to: "/referrals", label: "Referrals", icon: "gift", status: "live", permission: "referrals.view" },
+      { to: "/rewards", label: "Reward Points", icon: "star", status: "live", permission: "rewards.view" },
       {
-        to: "/control-tower",
-        label: "Order Control Tower",
-        icon: "tower",
-        status: "live", permission: "control_tower.view" },
-      {
-        to: "/vendor-routing",
-        label: "Vendor Matching & Re-routing",
-        icon: "route",
-        status: "live", permission: "vendor_routing.view" },
-      {
-        to: "/shipments",
-        label: "Shipments",
-        icon: "truck",
-        status: "live", permission: "shipments.view" },
-      {
-        to: "/delivery-zones",
-        label: "Delivery Zones & Rules",
-        icon: "mappin",
-        status: "live", permission: "vendors.view" },
-      {
-        to: "/delivery-partners",
-        label: "Delivery Partners",
-        icon: "bike",
-        status: "live", permission: "delivery_partners.view" },
-    ],
-  },
-  {
-    id: "finance",
-    label: "Payments & Finance",
-    items: [
-      { to: "/wallets", label: "Wallets", icon: "wallet", status: "live", permission: "wallets.view" },
-      { to: "/payments", label: "Payments", icon: "card", status: "live", permission: "payments.view" },
-      { to: "/refunds", label: "Refunds", icon: "refund", status: "live", permission: "refunds.view" },
-      {
-        to: "/invoices",
-        label: "Invoices & GST",
-        icon: "receipt",
-        status: "live", permission: "invoices.view" },
-      {
-        to: "/settlements",
-        label: "Settlements",
-        icon: "coins",
-        status: "live", permission: "settlements.view" },
-      {
-        to: "/credit-notes",
-        label: "Credit Notes",
-        icon: "note",
-        status: "live", permission: "credit_notes.view" },
-    ],
-  },
-  {
-    id: "post-purchase",
-    label: "Post-Purchase",
-    items: [
-      {
-        to: "/returns",
-        label: "Returns",
-        icon: "undo",
-        status: "live", permission: "returns.view" },
-      {
-        to: "/replacements",
-        label: "Replacements",
-        icon: "swap",
-        status: "live", permission: "replacements.view" },
-      {
-        to: "/cancellations",
-        label: "Cancellations",
-        icon: "ban",
-        status: "live", permission: "cancellations.view" },
-      {
-        to: "/support",
-        label: "Support Tickets",
-        icon: "headset",
-        status: "live", permission: "support.view" },
-      {
-        to: "/reviews",
-        label: "Reviews & Ratings",
-        icon: "star",
-        status: "live", permission: "reviews.view" },
+        to: "/organisation",
+        label: "Organisation",
+        icon: "network",
+        status: "live", permission: "organisation.view" },
     ],
   },
   {
@@ -240,9 +265,14 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    id: "marketing",
-    label: "Marketing & CMS",
+    id: "offers",
+    label: "Offers & Campaigns",
     items: [
+      {
+        to: "/campaigns",
+        label: "Campaigns",
+        icon: "megaphone",
+        status: "live", permission: "campaigns.view" },
       {
         to: "/offers",
         label: "Offers & Coupons",
@@ -253,18 +283,32 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Shop Offers",
         icon: "tag",
         status: "live", permission: "offers.view" },
-      { to: "/banners", label: "Banners", icon: "image", status: "live", permission: "banners.view" },
-      { to: "/menu", label: "App Menu", icon: "menu", status: "live", permission: "app_menu.view" },
+    ],
+  },
+  {
+    id: "app-content",
+    label: "App Content",
+    items: [
       {
         to: "/cms",
         label: "Home Sections",
         icon: "sections",
         status: "live", permission: "home_sections.view" },
+      { to: "/banners", label: "Banners", icon: "image", status: "live", permission: "banners.view" },
+      { to: "/menu", label: "App Menu", icon: "menu", status: "live", permission: "app_menu.view" },
       {
-        to: "/campaigns",
-        label: "Campaigns",
-        icon: "megaphone",
-        status: "live", permission: "campaigns.view" },
+        to: "/languages",
+        label: "App Languages",
+        icon: "globe",
+        status: "live",
+        permission: "settings.view",
+      },
+    ],
+  },
+  {
+    id: "ads",
+    label: "Advertising",
+    items: [
       {
         to: "/ads",
         label: "Ad Promotions",
@@ -277,6 +321,13 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/ads/campaigns",
         label: "Ad Campaigns",
         icon: "image",
+        status: "live",
+        permission: "ad_promotions.view",
+      },
+      {
+        to: "/ads/pricing",
+        label: "Ad Pricing",
+        icon: "coins",
         status: "live",
         permission: "ad_promotions.view",
       },
@@ -294,42 +345,41 @@ export const NAV_GROUPS: NavGroup[] = [
         status: "live",
         permission: "ad_promotions.view",
       },
-      {
-        to: "/ads/pricing",
-        label: "Ad Pricing",
-        icon: "coins",
-        status: "live",
-        permission: "ad_promotions.view",
-      },
-      { to: "/rewards", label: "Reward Points", icon: "star", status: "live", permission: "rewards.view" },
-      {
-        // A personal inbox scoped to the signed-in account, like Settings'
-        // profile tab — every admin sees their own regardless of role, so
-        // this is intentionally not gated by a module permission.
-        to: "/notifications",
-        label: "Notifications",
-        icon: "bell",
-        status: "live",
-      },
     ],
   },
   {
-    id: "community",
-    label: "Customers & Network",
+    id: "finance",
+    label: "Payments & Finance",
     items: [
-      { to: "/users", label: "Users", icon: "users", status: "live", permission: "users.view" },
+      { to: "/payments", label: "Payments", icon: "card", status: "live", permission: "payments.view" },
+      { to: "/wallets", label: "Wallets", icon: "wallet", status: "live", permission: "wallets.view" },
       {
-        to: "/organisation",
-        label: "Organisation",
-        icon: "network",
-        status: "live", permission: "organisation.view" },
-      { to: "/referrals", label: "Referrals", icon: "gift", status: "live", permission: "referrals.view" },
+        to: "/settlements",
+        label: "Settlements",
+        icon: "coins",
+        status: "live", permission: "settlements.view" },
+      {
+        to: "/invoices",
+        label: "Invoices & GST",
+        icon: "receipt",
+        status: "live", permission: "invoices.view" },
+      {
+        to: "/credit-notes",
+        label: "Credit Notes",
+        icon: "note",
+        status: "live", permission: "credit_notes.view" },
+      { to: "/payment-settings", label: "Payment settings", icon: "settings", status: "live", permission: "payments.view" },
     ],
   },
   {
     id: "system",
-    label: "System & Administration",
+    label: "Settings & Admin",
     items: [
+      {
+        to: "/settings",
+        label: "General Settings",
+        icon: "settings",
+        status: "live", permission: "settings.view" },
       {
         to: "/staff",
         label: "Admin Staff & RBAC",
@@ -356,25 +406,6 @@ export const NAV_GROUPS: NavGroup[] = [
         status: "live",
         // One permission module per registry category; viewing any one opens the menu.
         permission: "platform_*.view",
-      },
-      {
-        to: "/approvals",
-        label: "Approvals",
-        icon: "shield",
-        status: "live",
-        // Open to all staff: each sees their own requests; super admins see and decide all.
-      },
-      {
-        to: "/settings",
-        label: "General Settings",
-        icon: "settings",
-        status: "live", permission: "settings.view" },
-      {
-        to: "/languages",
-        label: "App Languages",
-        icon: "globe",
-        status: "live",
-        permission: "settings.view",
       },
       {
         to: "/channels",

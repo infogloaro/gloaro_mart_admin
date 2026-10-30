@@ -10,6 +10,8 @@ import { StatCard } from '../components/ui/StatCard';
 import { PendingApiNotice } from '../components/ui/PendingApiNotice';
 import type {
   AdminShipment,
+  DeliveryProvider,
+  DeliveryRouting,
   Paged,
   PartnerCandidate,
   ShipmentDetail,
@@ -26,6 +28,36 @@ const ENDPOINTS = [
 
 const FILTERS = ['all', 'in_transit', 'out_for_delivery', 'delivered', 'failed'] as const;
 type Filter = (typeof FILTERS)[number];
+
+/** DR3: who carries it — GoKart riders near the shop, Shiprocket beyond. */
+const PARTNER_FILTERS = [
+  { key: 'all', label: 'All partners' },
+  { key: 'gokart', label: 'GoKart' },
+  { key: 'shiprocket', label: 'Shiprocket' },
+  { key: 'needs_booking', label: 'Needs booking' },
+] as const;
+type PartnerFilter = (typeof PARTNER_FILTERS)[number]['key'];
+
+const PROVIDER_LABEL: Record<DeliveryProvider, string> = { gokart: 'GoKart', shiprocket: 'Shiprocket', manual: 'Manual' };
+const PROVIDER_TONE: Record<DeliveryProvider, string> = {
+  gokart: 'border-blue-200 bg-blue-50 text-blue-700',
+  shiprocket: 'border-orange-200 bg-orange-50 text-orange-700',
+  manual: 'border-slate-200 bg-slate-100 text-slate-600',
+};
+
+function ProviderBadge({ provider }: { provider: DeliveryProvider }) {
+  return (
+    <span
+      className={`inline-block rounded-md border px-1.5 py-px text-[10px] font-bold whitespace-nowrap ${PROVIDER_TONE[provider]}`}
+    >
+      {PROVIDER_LABEL[provider]}
+    </span>
+  );
+}
+
+function km(value: number | null): string | null {
+  return value == null ? null : `${value < 10 ? value.toFixed(1) : Math.round(value)} km`;
+}
 
 /** Every status a shipment can be moved to by hand, in the order it happens. */
 const RECORDABLE: ShipmentStatus[] = [
@@ -94,6 +126,7 @@ function StatusPill({ status }: { status: ShipmentStatus }) {
 
 export default function ShipmentsPage() {
   const [filter, setFilter] = useState<Filter>('all');
+  const [partner, setPartner] = useState<PartnerFilter>('all');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const debounced = useDebounced(search, 300);
@@ -103,6 +136,7 @@ export default function ShipmentsPage() {
 
   const query = [
     filter === 'all' ? '' : `status=${filter}`,
+    partner === 'all' ? '' : partner === 'needs_booking' ? 'booking=needs_booking' : `provider=${partner}`,
     `page=${page}`,
     debounced ? `q=${encodeURIComponent(debounced)}` : '',
   ]
@@ -111,6 +145,7 @@ export default function ShipmentsPage() {
 
   const { data, loading, error, reload } = useApiData<Paged<AdminShipment>>(`/api/admin/shipments?${query}`, [
     filter,
+    partner,
     page,
     debounced,
   ]);
@@ -127,6 +162,8 @@ export default function ShipmentsPage() {
           delivery closes the shipment while the order stays open.
         </p>
       </div>
+
+      <RoutingCard />
 
       {actionError && (
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">
@@ -191,6 +228,24 @@ export default function ShipmentsPage() {
         </div>
       )}
 
+      {summary && summary.needsBooking > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            setPartner('needs_booking');
+            setPage(1);
+          }}
+          className="flex w-full items-center gap-2.5 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-left text-sm text-orange-800 hover:bg-orange-100"
+        >
+          <Icon name="package" className="h-4 w-4 shrink-0" />
+          <span>
+            <span className="font-semibold">{summary.needsBooking}</span> Shiprocket shipment
+            {summary.needsBooking === 1 ? ' is' : 's are'} not booked yet. Book{summary.needsBooking === 1 ? ' it' : ' them'}{' '}
+            in Shiprocket and enter the AWB here.
+          </span>
+        </button>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex gap-1 rounded-xl border border-slate-200 bg-white p-1">
           {FILTERS.map((f) => (
@@ -208,6 +263,24 @@ export default function ShipmentsPage() {
             </button>
           ))}
         </div>
+        <select
+          aria-label="Delivery partner"
+          value={partner}
+          onChange={(e) => {
+            setPartner(e.target.value as PartnerFilter);
+            setPage(1);
+          }}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600"
+        >
+          {PARTNER_FILTERS.map((p) => (
+            <option key={p.key} value={p.key}>
+              {p.label}
+              {summary && p.key === 'gokart' ? ` (${summary.gokartOpen} open)` : ''}
+              {summary && p.key === 'shiprocket' ? ` (${summary.shiprocketOpen} open)` : ''}
+              {summary && p.key === 'needs_booking' ? ` (${summary.needsBooking})` : ''}
+            </option>
+          ))}
+        </select>
         <div className="relative w-64">
           <Icon name="search" className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
@@ -269,17 +342,36 @@ export default function ShipmentsPage() {
               },
               {
                 header: 'Partner',
-                render: (s) =>
-                  s.partnerName ? (
-                    <span>
-                      <span className="block text-ink">{s.partnerName}</span>
-                      {s.externalTrackingId && (
-                        <span className="block font-mono text-[11px] text-slate-400">{s.externalTrackingId}</span>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="text-xs font-semibold text-amber-600">Unassigned</span>
-                  ),
+                render: (s) => (
+                  <span>
+                    {s.provider && (
+                      <span className="mb-0.5 flex items-center gap-1.5">
+                        <ProviderBadge provider={s.provider} />
+                        {km(s.distanceKm) && <span className="text-[11px] text-slate-400">{km(s.distanceKm)}</span>}
+                      </span>
+                    )}
+                    {s.provider === 'shiprocket' ? (
+                      s.externalTrackingId ? (
+                        <span className="block font-mono text-[11px] text-slate-500">AWB {s.externalTrackingId}</span>
+                      ) : (
+                        <span className="text-xs font-semibold text-orange-600">
+                          {s.bookingStatus === 'failed' ? 'Booking failed' : 'Needs booking'}
+                        </span>
+                      )
+                    ) : s.partnerName ? (
+                      <>
+                        <span className="block text-ink">{s.partnerName}</span>
+                        {s.externalTrackingId && (
+                          <span className="block font-mono text-[11px] text-slate-400">{s.externalTrackingId}</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-xs font-semibold text-amber-600">
+                        {s.provider === 'gokart' ? 'No rider yet' : 'Unassigned'}
+                      </span>
+                    )}
+                  </span>
+                ),
               },
               {
                 header: 'COD',
@@ -375,6 +467,45 @@ function ShipmentDrawer({
   const [note, setNote] = useState('');
   const [location, setLocation] = useState('');
   const [busy, setBusy] = useState(false);
+  const [awb, setAwb] = useState('');
+  const [awbUrl, setAwbUrl] = useState('');
+
+  async function switchProvider(provider: DeliveryProvider) {
+    onError(null);
+    setBusy(true);
+    try {
+      await api.post(`/api/admin/shipments/${id}/provider`, { provider });
+      reload();
+      reloadCandidates();
+      onChanged();
+    } catch (err) {
+      onError(err instanceof ApiError ? err.message : 'Could not change the partner.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Booked by hand in Shiprocket's panel: the AWB marks it booked. */
+  async function saveAwb(e: FormEvent) {
+    e.preventDefault();
+    if (!awb.trim()) return;
+    onError(null);
+    setBusy(true);
+    try {
+      await api.patch(`/api/admin/shipments/${id}`, {
+        externalTrackingId: awb.trim(),
+        trackingUrl: awbUrl.trim() || `https://shiprocket.co/tracking/${encodeURIComponent(awb.trim())}`,
+      });
+      setAwb('');
+      setAwbUrl('');
+      reload();
+      onChanged();
+    } catch (err) {
+      onError(err instanceof ApiError ? err.message : 'Could not save the AWB.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function recordEvent(e: FormEvent) {
     e.preventDefault();
@@ -444,7 +575,22 @@ function ShipmentDrawer({
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm sm:grid-cols-3">
             <Field label="Order" value={data.orderReference} />
             <Field label="Vendor" value={data.vendorName} />
-            <Field label="Partner" value={data.partnerName ?? 'Unassigned'} />
+            <Field
+              label="Partner"
+              value={
+                data.provider === 'shiprocket'
+                  ? data.externalTrackingId
+                    ? `Shiprocket · AWB ${data.externalTrackingId}`
+                    : 'Shiprocket · not booked'
+                  : [data.provider ? PROVIDER_LABEL[data.provider] : null, data.partnerName ?? 'Unassigned']
+                      .filter(Boolean)
+                      .join(' · ')
+              }
+            />
+            <Field
+              label="Distance"
+              value={[km(data.distanceKm), data.deliveryMode].filter(Boolean).join(' · ') || '—'}
+            />
             <Field label="Customer" value={data.customerName} />
             <Field label="Phone" value={data.customerPhone ?? '—'} />
             <Field label="City" value={data.deliveryCity ?? '—'} />
@@ -494,9 +640,73 @@ function ShipmentDrawer({
 
           {!closed && (
             <div className="rounded-xl border border-slate-200 p-4">
+              <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">Carried by</span>
+              <div className="flex flex-wrap gap-1.5">
+                {(['gokart', 'shiprocket', 'manual'] as DeliveryProvider[]).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    disabled={busy || data.provider === p || data.bookingStatus === 'booked'}
+                    onClick={() => switchProvider(p)}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      data.provider === p
+                        ? PROVIDER_TONE[p]
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 disabled:opacity-50'
+                    }`}
+                  >
+                    {PROVIDER_LABEL[p]}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-400">
+                {data.bookingStatus === 'booked'
+                  ? 'Booked with Shiprocket — cancel it there before moving it.'
+                  : 'Checkout picked this by distance from the shop. Moving it to Shiprocket takes it off the rider.'}
+              </p>
+            </div>
+          )}
+
+          {!closed && data.provider === 'shiprocket' && (
+            <form onSubmit={saveAwb} className="space-y-3 rounded-xl border border-orange-200 bg-orange-50/40 p-4">
+              <h3 className="text-[11px] font-bold tracking-wide text-orange-700 uppercase">
+                Shiprocket booking ·{' '}
+                {data.bookingStatus === 'booked' ? 'booked' : data.bookingStatus === 'failed' ? 'failed' : 'not booked'}
+              </h3>
+              {data.bookingError && <p className="text-xs text-rose-700">{data.bookingError}</p>}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <input
+                  value={awb}
+                  onChange={(e) => setAwb(e.target.value)}
+                  placeholder={data.externalTrackingId ? `AWB ${data.externalTrackingId}` : 'AWB number'}
+                  className={inputClass}
+                />
+                <input
+                  value={awbUrl}
+                  onChange={(e) => setAwbUrl(e.target.value)}
+                  placeholder="Tracking link (optional)"
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[11px] text-slate-500">
+                  Book it in the Shiprocket panel, then enter the AWB. Automatic booking comes next.
+                </p>
+                <button
+                  type="submit"
+                  disabled={busy || !awb.trim()}
+                  className="shrink-0 rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-45"
+                >
+                  Save AWB
+                </button>
+              </div>
+            </form>
+          )}
+
+          {!closed && data.provider !== 'shiprocket' && (
+            <div className="rounded-xl border border-slate-200 p-4">
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-bold tracking-wide text-slate-500 uppercase">
-                  Delivery partner
+                  {data.provider === 'gokart' ? 'GoKart rider' : 'Delivery partner'}
                 </span>
                 <select
                   value={data.partnerId ?? ''}
@@ -583,6 +793,164 @@ function ShipmentDrawer({
         </div>
       )}
     </Modal>
+  );
+}
+
+/* ----------------------------------------------------------------- routing */
+
+/**
+ * DR1: who carries an order, by its distance from the shop. Up to the radius
+ * GoKart (our own riders), beyond it Shiprocket. Applies from the next
+ * checkout; orders already placed keep their partner.
+ */
+function RoutingCard() {
+  const { data: loaded, error } = useApiData<DeliveryRouting>('/api/admin/shipments/routing');
+  // What the last save answered, so the card shows it without another round trip.
+  const [saved, setSaved] = useState<DeliveryRouting | null>(null);
+  const [editing, setEditing] = useState<DeliveryRouting | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const data = saved ?? loaded;
+  if (error || !data) return null;
+
+  async function save() {
+    if (!editing) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      setSaved(
+        await api.patch<DeliveryRouting>('/api/admin/shipments/routing', {
+          enabled: editing.enabled,
+          localRadiusKm: editing.localRadiusKm,
+          localPartner: editing.localPartner,
+          outstationPartner: editing.outstationPartner,
+        }),
+      );
+      setEditing(null);
+    } catch (err) {
+      setSaveError(err instanceof ApiError ? err.message : 'Could not save.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const local = data.localPartner === 'gokart' ? 'GoKart riders' : 'manual delivery';
+  const far = data.outstationPartner === 'shiprocket' ? 'Shiprocket' : 'manual courier';
+
+  return (
+    <>
+      <div className="card flex flex-wrap items-center gap-3 px-4 py-3">
+        <Icon name="route" className="h-5 w-5 shrink-0 text-blue-700" />
+        <div className="min-w-0 flex-1 text-sm">
+          <div className="font-semibold text-ink">Delivery routing {data.enabled ? '' : '· off'}</div>
+          <div className="text-xs text-slate-500">
+            {data.enabled ? (
+              <>
+                Up to <b>{data.localRadiusKm} km</b> from the shop: {local}. Beyond: {far}.
+              </>
+            ) : (
+              'Each shop’s own service area decides local or courier, and no partner is picked.'
+            )}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setEditing(data);
+            setSaveError(null);
+          }}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-700"
+        >
+          Edit
+        </button>
+      </div>
+
+      {editing && (
+        <Modal title="Delivery routing" onClose={() => setEditing(null)}>
+          <div className="space-y-4">
+            <label className="flex items-center justify-between gap-4">
+              <span>
+                <span className="block text-sm font-semibold text-ink">Route by distance</span>
+                <span className="block text-xs text-slate-500">
+                  Off: shops’ own areas decide, as before, and shipments get no partner.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                className="h-5 w-5 accent-blue-700"
+                checked={editing.enabled}
+                onChange={(e) => setEditing({ ...editing, enabled: e.target.checked })}
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-semibold text-ink">Local delivery up to</span>
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0.1}
+                  max={500}
+                  step={0.5}
+                  value={editing.localRadiusKm}
+                  onChange={(e) => setEditing({ ...editing, localRadiusKm: Number(e.target.value) })}
+                  className={inputClass}
+                />
+                <span className="text-sm text-slate-500">km</span>
+              </div>
+              <span className="text-xs text-slate-500">Straight-line distance from the shop to the customer.</span>
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-sm font-semibold text-ink">Within it</span>
+                <select
+                  value={editing.localPartner}
+                  onChange={(e) => setEditing({ ...editing, localPartner: e.target.value as DeliveryRouting['localPartner'] })}
+                  className={`${inputClass} mt-1`}
+                >
+                  <option value="gokart">GoKart (our riders)</option>
+                  <option value="manual">Manual</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold text-ink">Beyond it</span>
+                <select
+                  value={editing.outstationPartner}
+                  onChange={(e) =>
+                    setEditing({ ...editing, outstationPartner: e.target.value as DeliveryRouting['outstationPartner'] })
+                  }
+                  className={`${inputClass} mt-1`}
+                >
+                  <option value="shiprocket">Shiprocket</option>
+                  <option value="manual">Manual</option>
+                </select>
+              </label>
+            </div>
+            <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              Applies to the next order placed. Charges stay each shop’s own: its delivery charge within the distance, its
+              outstation charge beyond. A shop that doesn’t ship outside its area still isn’t offered beyond it.
+            </p>
+            {saveError && <p className="text-sm font-medium text-rose-700">{saveError}</p>}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditing(null)}
+                className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={save}
+                className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }
 

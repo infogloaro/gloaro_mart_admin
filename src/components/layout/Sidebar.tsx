@@ -76,7 +76,9 @@ function NavGroupBlock({
   collapsed: boolean;
   onNavigate: () => void;
 }) {
-  const [open, setOpen] = useState(true);
+  // Closed by default so the 14 headings fit on one screen; Overview stays
+  // open, and the group holding the open page opens itself (forceOpen).
+  const [open, setOpen] = useState(group.id === 'overview');
   const expanded = forceOpen || open;
   const soonCount = group.items.filter((i) => i.status === 'soon').length;
 

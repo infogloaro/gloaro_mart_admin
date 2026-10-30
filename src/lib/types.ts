@@ -962,7 +962,26 @@ export interface AdminShipment {
   /** Attempts, not parcels — a second attempt is the same shipment. */
   attemptCount: number;
   failureReason: string | null;
+  /** DR3: who carries it. Null on shipments from before delivery routing. */
+  provider: DeliveryProvider | null;
+  /** Shiprocket shipments start as needs_booking until their AWB is in. */
+  bookingStatus: 'not_needed' | 'needs_booking' | 'booked' | 'failed';
+  bookingError: string | null;
+  deliveryMode: 'local' | 'courier' | 'pickup' | null;
+  /** Shop to customer, straight line, as checkout measured it. */
+  distanceKm: number | null;
   createdAt: string;
+}
+
+export type DeliveryProvider = 'gokart' | 'shiprocket' | 'manual';
+
+/** GET/PATCH /api/admin/shipments/routing (backend DR1). */
+export interface DeliveryRouting {
+  enabled: boolean;
+  localRadiusKm: number;
+  localPartner: 'gokart' | 'manual';
+  outstationPartner: 'shiprocket' | 'manual';
+  updatedAt: string | null;
 }
 
 export interface ShipmentDetail extends AdminShipment {
@@ -979,6 +998,10 @@ export interface ShipmentSummary {
   late: number;
   /** Created but with no delivery partner on it yet. */
   unassigned: number;
+  /** DR3: open shipments per partner, and Shiprocket ones still to book. */
+  gokartOpen: number;
+  shiprocketOpen: number;
+  needsBooking: number;
   avgDeliveryHours: number | null;
 }
 
