@@ -65,6 +65,9 @@ import ApprovalsPage from './routes/ApprovalsPage';
 import NotificationsPage from './routes/NotificationsPage';
 import ComingSoonPage from './routes/ComingSoonPage';
 import ShopReportsPage from './routes/ShopReportsPage';
+import ShopHealthPage from './routes/ShopHealthPage';
+import PausedShopsPage from './routes/PausedShopsPage';
+import ShopBroadcastsPage from './routes/ShopBroadcastsPage';
 import ShopOffersPage from './routes/ShopOffersPage';
 import AdTapReviewPage from './routes/AdTapReviewPage';
 
@@ -79,6 +82,9 @@ export default function App() {
             <Route path="/users" element={<UsersPage />} />
             <Route path="/vendors" element={<VendorsPage />} />
             <Route path="/vendors/reports" element={<ShopReportsPage />} />
+            <Route path="/vendors/health" element={<ShopHealthPage />} />
+            <Route path="/vendors/paused" element={<PausedShopsPage />} />
+            <Route path="/vendors/broadcasts" element={<ShopBroadcastsPage />} />
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/offers" element={<OffersPage />} />
             <Route path="/offers/shops" element={<ShopOffersPage />} />

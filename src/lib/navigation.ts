@@ -218,6 +218,21 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: "flag",
         status: "live", permission: "vendors.view" },
       {
+        to: "/vendors/health",
+        label: "Shop Health",
+        icon: "shield",
+        status: "live", permission: "vendors.view" },
+      {
+        to: "/vendors/paused",
+        label: "Paused & Busy Shops",
+        icon: "history",
+        status: "live", permission: "vendors.view" },
+      {
+        to: "/vendors/broadcasts",
+        label: "Shop Messages",
+        icon: "chat",
+        status: "live", permission: "vendors.view" },
+      {
         to: "/commission-plans",
         label: "Commission Plans",
         icon: "percent",
