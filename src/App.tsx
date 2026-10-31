@@ -52,6 +52,8 @@ import DeliveryPartnersPage from './routes/DeliveryPartnersPage';
 import HomeSectionsPage from './routes/HomeSectionsPage';
 import CampaignsPage from './routes/CampaignsPage';
 import AnalyticsPage from './routes/AnalyticsPage';
+import ReportsPage from './routes/ReportsPage';
+import ReportViewPage from './routes/ReportViewPage';
 import AdminLogsPage from './routes/AdminLogsPage';
 import FeatureFlagsPage from './routes/FeatureFlagsPage';
 import PlatformRegistryPage from './routes/PlatformRegistryPage';
@@ -132,6 +134,8 @@ export default function App() {
             <Route path="/cms" element={<HomeSectionsPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/reports/:key" element={<ReportViewPage />} />
             <Route path="/audit-logs" element={<AdminLogsPage />} />
             <Route path="/feature-flags" element={<FeatureFlagsPage />} />
             <Route path="/platform-registry" element={<PlatformRegistryPage />} />

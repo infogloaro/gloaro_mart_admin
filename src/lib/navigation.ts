@@ -56,6 +56,11 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: "chart",
         status: "live", permission: "analytics.view" },
       {
+        to: "/reports",
+        label: "Reports",
+        icon: "filetext",
+        status: "live", permission: "reports.view" },
+      {
         to: "/approvals",
         label: "Approvals",
         icon: "shield",
