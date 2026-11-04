@@ -113,6 +113,17 @@ export default function ReviewsPage() {
     }
   }
 
+  async function removePhoto(review: AdminReview, path: string) {
+    if (!window.confirm('Remove this photo from the review? The customer is told; the review stays up.')) return;
+    setActionError(null);
+    try {
+      await api.post(`/api/admin/reviews/${review.id}/remove-photo`, { path });
+      refresh();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'Could not remove the photo.');
+    }
+  }
+
   async function removeReply(review: AdminReview) {
     setActionError(null);
     try {
@@ -338,13 +349,25 @@ export default function ReviewsPage() {
               {r.photos.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {r.photos.map((url) => (
-                    <a key={url} href={url} target="_blank" rel="noreferrer">
-                      <img
-                        src={url}
-                        alt=""
-                        className="h-16 w-16 rounded-lg border border-slate-200 object-cover"
-                      />
-                    </a>
+                    <div key={url} className="group relative">
+                      <a href={url} target="_blank" rel="noreferrer">
+                        <img
+                          src={url}
+                          alt=""
+                          className="h-16 w-16 rounded-lg border border-slate-200 object-cover"
+                        />
+                      </a>
+                      {can.edit && (
+                        <button
+                          type="button"
+                          title="Remove this photo"
+                          onClick={() => removePhoto(r, url)}
+                          className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-rose-600 text-[11px] font-bold text-white shadow"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
