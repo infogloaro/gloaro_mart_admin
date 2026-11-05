@@ -91,6 +91,9 @@ export interface ServiceCategory {
   image_url: string | null;
   sort_order: number;
   is_active: boolean;
+  /** SV8: this category's commission %, or null for the global plan's rate (default_commission_percent). */
+  commission_percent: number | null;
+  default_commission_percent: number | null;
   service_count: number;
   provider_count: number;
 }
@@ -112,7 +115,73 @@ export interface AdminService {
   vendor_id: number;
   vendor_name: string;
   vendor_city: string | null;
+  /** SV10: the shop carries the verified badge. */
+  vendor_verified?: boolean;
   updated_at: string;
+}
+
+/** SV10: Admin → Service bookings. */
+export interface AdminServiceBooking {
+  id: number;
+  reference: string;
+  status: string;
+  serviceTitle: string;
+  startsAt: string;
+  endsAt: string;
+  createdAt: string;
+  updatedAt: string;
+  atHome: boolean;
+  shop: { id: number; name: string; city: string | null };
+  customer: { id: number; name: string; phone: string | null };
+  price: { type: string; cents: number | null; visitFeeCents: number | null; totalCents: number | null };
+  coupon: { code: string; discountCents: number } | null;
+  payOnline: boolean;
+  payment: { status: string; amountCents: number; instrument: string | null; refundCents: number; providerPaymentId: string | null; failureReason: string | null } | null;
+  commission: { cents: number; percent: number; shopCents: number } | null;
+  cancelledBy: string | null;
+  ticketCount: number;
+}
+
+export interface AdminServiceBookingDetail extends AdminServiceBooking {
+  visitAddress: string | null;
+  note: string | null;
+  statusNote: string | null;
+  package: { name: string; cents: number | null } | null;
+  addons: { name: string; cents: number }[];
+  listPriceCents: number | null;
+  payDeadline: string | null;
+  events: { status: string; by: string; note: string | null; at: string }[];
+  paymentEvents: { event: string; amountCents: number; note: string | null; at: string }[];
+  tickets: { id: number; reference: string; subject: string; status: string; category: string; createdAt: string }[];
+}
+
+export interface ServiceBookingSummary {
+  pending: number;
+  today: number;
+  completedWeek: number;
+  unpaid: number;
+  refundFailed: number;
+  onlineCents30d: number;
+  commissionCents30d: number;
+}
+
+export interface AdminServiceCommissions {
+  month: string;
+  totals: { bookings: number; grossCents: number; commissionCents: number; onlineCents: number; owedToShopsCents: number; owedByShopsCents: number; unsettledCents: number };
+  items: {
+    id: number;
+    bookingId: number;
+    reference: string;
+    serviceTitle: string;
+    shop: { id: number; name: string };
+    completedAt: string;
+    grossCents: number;
+    commissionPercent: number;
+    commissionCents: number;
+    paidOnline: boolean;
+    shopCents: number;
+    settlement: { reference: string; status: string } | null;
+  }[];
 }
 
 export interface PlatformSettings {
@@ -1946,6 +2015,10 @@ export interface AdminTicket {
   requesterEmail: string | null;
   requesterPhone: string | null;
   orderReference: string | null;
+  /** SV9: the service booking the ticket is about, if any. */
+  bookingId: number | null;
+  bookingReference: string | null;
+  bookingService: string | null;
   vendorName: string | null;
   assigneeId: number | null;
   assigneeName: string | null;

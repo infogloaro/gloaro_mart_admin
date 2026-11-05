@@ -10,6 +10,9 @@ interface PaymentSettings {
   onlineEnabled: boolean;
   codEnabled: boolean;
   codMaxCents: number | null;
+  /** SV7: service bookings — pay online when booking: off / optional / required; refund a customer's own cancellation. */
+  bookingPayNow: 'off' | 'optional' | 'required';
+  bookingRefundOnCancel: boolean;
   updatedAt: string | null;
   /** Online is what customers really get: the switch and working keys. */
   onlineLive: boolean;
@@ -48,7 +51,7 @@ export default function PaymentSettingsPage() {
     setCodLimit(loaded.codMaxCents == null ? '' : String(loaded.codMaxCents / 100));
   }, [loaded]);
 
-  async function patch(body: Partial<Pick<PaymentSettings, 'onlineEnabled' | 'codEnabled' | 'codMaxCents'>>, done: string) {
+  async function patch(body: Partial<Pick<PaymentSettings, 'onlineEnabled' | 'codEnabled' | 'codMaxCents' | 'bookingPayNow' | 'bookingRefundOnCancel'>>, done: string) {
     setBusy(true);
     setMessage(null);
     try {
@@ -242,6 +245,47 @@ export default function PaymentSettingsPage() {
                 Save limit
               </button>
             </div>
+          </div>
+
+          {/* SV7: service bookings */}
+          <div className="card divide-y divide-slate-100">
+            <div className="px-5 py-4">
+              <div className="text-sm font-semibold text-ink">Service bookings — pay online</div>
+              <p className="mt-1 text-xs text-slate-500">
+                Bookings with a fixed total (a fixed price or a package) can be paid in the app through Razorpay when booking, or
+                later from the booking page. Needs Pay online above. Other bookings are always paid to the shop after the work.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(
+                  [
+                    ['off', 'Off', 'Customers pay the shop after the work.'],
+                    ['optional', 'Optional', 'Customers choose: pay now or after the work.'],
+                    ['required', 'Required', 'A booking with a fixed total is paid when it is made.'],
+                  ] as const
+                ).map(([value, label, hint]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    disabled={busy || (value !== 'off' && !data.onlineLive)}
+                    title={hint}
+                    onClick={() => patch({ bookingPayNow: value }, `Service bookings: pay online is ${label.toLowerCase()}.`)}
+                    className={`rounded-lg border px-3 py-1.5 text-sm font-semibold disabled:opacity-50 ${
+                      data.bookingPayNow === value ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-300 bg-white text-ink hover:bg-slate-50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {!data.onlineLive && <p className="mt-2 text-xs text-amber-700">Turn Pay online on (with working keys) to offer it on bookings.</p>}
+            </div>
+            <Toggle
+              title="Refund when the customer cancels"
+              hint="A paid booking the customer cancels before it starts is refunded in full through Razorpay. Off: the money stays with the shop. A booking the shop rejects or cancels is always refunded."
+              checked={data.bookingRefundOnCancel}
+              disabled={busy}
+              onChange={(v) => patch({ bookingRefundOnCancel: v }, v ? 'Customer cancellations are refunded.' : 'Customer cancellations are not refunded.')}
+            />
           </div>
 
           <p className="text-xs text-slate-500">

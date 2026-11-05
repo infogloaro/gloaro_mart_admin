@@ -237,6 +237,7 @@ export default function SupportPage() {
                     <span className="block font-mono text-[11px] text-slate-400">
                       {t.reference} · {t.category}
                       {t.orderReference && ` · ${t.orderReference}`}
+                      {t.bookingReference && ` · ${t.bookingReference}`}
                     </span>
                   </span>
                 ),
@@ -431,6 +432,7 @@ function TicketModal({
             <Field label="Email" value={data.requesterEmail ?? '—'} />
             <Field label="Phone" value={data.requesterPhone ?? '—'} />
             <Field label="Order" value={data.orderReference ?? '—'} />
+            <Field label="Booking" value={data.bookingReference ? `${data.bookingReference}${data.bookingService ? ` · ${data.bookingService}` : ''}` : '—'} />
             <Field label="Opened" value={formatWhen(data.createdAt)} />
             <Field label="First reply" value={formatWhen(data.firstRespondedAt)} />
           </dl>

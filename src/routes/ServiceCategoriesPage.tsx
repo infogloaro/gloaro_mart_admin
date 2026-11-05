@@ -10,14 +10,18 @@ import type { AdminService, ServiceCategory } from '../lib/types';
 
 // Near Me → Services (NS4). The app groups the tiles by these, in this order.
 const GROUPS: { key: string; label: string }[] = [
-  { key: 'vehicle', label: 'Vehicle' },
+  // SV2: the ten groups of the services prompt, then daily help and other.
+  { key: 'vehicle', label: 'Vehicle services' },
   { key: 'home', label: 'Home repair & care' },
-  { key: 'gadgets', label: 'Gadgets' },
-  { key: 'personal', label: 'Personal care' },
+  { key: 'cleaning', label: 'Cleaning services' },
+  { key: 'personal', label: 'Beauty & wellness' },
+  { key: 'health', label: 'Health & wellness' },
+  { key: 'learning', label: 'Education & learning' },
+  { key: 'events', label: 'Events & entertainment' },
+  { key: 'moving', label: 'Moving & transport' },
+  { key: 'gadgets', label: 'Electronics & IT' },
+  { key: 'pets', label: 'Pet care' },
   { key: 'daily', label: 'Daily help' },
-  { key: 'learning', label: 'Learning' },
-  { key: 'events', label: 'Events' },
-  { key: 'health', label: 'Health' },
   { key: 'other', label: 'More services' },
 ];
 const groupLabel = (key: string) => GROUPS.find((g) => g.key === key)?.label ?? key;
@@ -27,6 +31,10 @@ const ICON_OPTIONS = [
   'car', 'bike', 'car_wash', 'ac', 'electrician', 'plumber', 'carpenter', 'painter', 'water', 'appliance',
   'pest', 'cleaning', 'mobile', 'laptop', 'salon', 'beauty', 'tailor', 'laundry', 'tuition', 'camera',
   'health', 'pet', 'other',
+  // SV2
+  'tyre', 'battery', 'towing', 'bathroom', 'sofa', 'spa', 'makeup', 'doctor', 'dental', 'lab', 'physio', 'nursing',
+  'ambulance', 'music', 'dance', 'computer', 'language', 'video', 'dj', 'catering', 'decor', 'moving', 'truck', 'cctv',
+  'wifi', 'pet_walk', 'vet',
 ];
 
 const PRICE = (s: AdminService) => {
@@ -166,6 +174,15 @@ function CategoriesTab() {
               },
               { header: 'Group', render: (c) => groupLabel(c.group_key) },
               {
+                header: 'Commission',
+                render: (c) =>
+                  c.commission_percent != null ? (
+                    `${c.commission_percent}%`
+                  ) : (
+                    <span className="text-slate-400">{c.default_commission_percent != null ? `${c.default_commission_percent}% (default)` : 'default'}</span>
+                  ),
+              },
+              {
                 header: 'Shops',
                 render: (c) => (
                   <span title={`${c.service_count} service(s) in total`}>
@@ -287,6 +304,8 @@ function ServiceCategoryForm({
   const [iconKey, setIconKey] = useState(category?.icon_key ?? 'other');
   const [imageUrl, setImageUrl] = useState(category?.image_url ?? '');
   const [isActive, setIsActive] = useState(category ? category.is_active : true);
+  // SV8: empty = the global commission plan's rate.
+  const [commission, setCommission] = useState(category?.commission_percent == null ? '' : String(category.commission_percent));
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -302,7 +321,9 @@ function ServiceCategoryForm({
       iconKey,
       imageUrl: imageUrl.trim() || null,
       isActive,
+      commissionPercent: commission.trim() === '' ? null : Number(commission),
     };
+    if (body.commissionPercent != null && !(body.commissionPercent >= 0 && body.commissionPercent <= 100)) return setError('Commission is a percentage from 0 to 100, or empty for the default.');
     setSubmitting(true);
     try {
       if (isEdit) await api.patch(`/api/admin/service-categories/${category.id}`, body);
@@ -365,6 +386,23 @@ function ServiceCategoryForm({
             A square photo works best. Leave empty to keep the app's built-in photo (or the icon for a new category).
           </p>
         </div>
+        <div>
+          <label className={label}>Commission on completed bookings (%)</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={0.5}
+            value={commission}
+            onChange={(e) => setCommission(e.target.value)}
+            placeholder={category?.default_commission_percent != null ? `${category.default_commission_percent} (default)` : 'Default from Commission plans'}
+            className={inputClass}
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            Taken on each completed booking of this type. Empty = the global commission plan's rate. A booking paid online is paid to the shop less
+            this; one paid to the shop is charged it on the weekly payout.
+          </p>
+        </div>
         <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
           Visible in the app
@@ -386,8 +424,11 @@ function ServiceCategoryForm({
 function ServicesTab() {
   const can = useCan('categories');
   const [status, setStatus] = useState('');
+  // SV10: only services of shops with the verified badge.
+  const [verified, setVerified] = useState(false);
   const { data: services, loading, error, reload } = useApiData<AdminService[]>(
-    `/api/admin/services${status ? `?status=${status}` : ''}`
+    `/api/admin/services?${[status ? `status=${status}` : '', verified ? 'verified=true' : ''].filter(Boolean).join('&')}`,
+    [status, verified]
   );
   const [hiding, setHiding] = useState<AdminService | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -416,6 +457,10 @@ function ServicesTab() {
           <option value="paused">Paused by the shop</option>
           <option value="hidden">Hidden by Gloaro</option>
         </select>
+        <label className="ml-2 flex items-center gap-1.5">
+          <input type="checkbox" checked={verified} onChange={(e) => setVerified(e.target.checked)} />
+          Verified shops only
+        </label>
       </div>
       {actionError && <div className={errorBox}>{actionError}</div>}
       {loading && <div className="p-8 text-center text-sm font-medium text-slate-400">Loading…</div>}
@@ -437,7 +482,10 @@ function ServicesTab() {
                 header: 'Shop',
                 render: (s) => (
                   <div>
-                    <div>{s.vendor_name}</div>
+                    <div>
+                      {s.vendor_name}
+                      {s.vendor_verified && <span className="ml-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">VERIFIED</span>}
+                    </div>
                     <div className="text-xs text-slate-500">{s.vendor_city ?? ''}</div>
                   </div>
                 ),

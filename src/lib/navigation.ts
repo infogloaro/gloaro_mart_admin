@@ -194,6 +194,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Service categories",
         icon: "layers",
         status: "live", permission: "categories.view" },
+      // SV10: bookings, payments, commission, payouts and complaints of Near Me services.
+      {
+        to: "/service-bookings",
+        label: "Service bookings",
+        icon: "calendar",
+        status: "live", permission: "categories.view" },
       { to: "/brands", label: "Brands", icon: "tag", status: "live", permission: "brands.view" },
       {
         to: "/attributes",
