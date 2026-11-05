@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, ApiError, isMissingEndpoint } from '../lib/api';
+import { api, API_URL, ApiError, isMissingEndpoint } from '../lib/api';
 import { useApiData } from '../lib/useApiData';
 import { useDebounced } from '../lib/useDebounced';
 import { DataTable } from '../components/ui/DataTable';
@@ -470,6 +470,28 @@ function ShipmentDrawer({
   const [awb, setAwb] = useState('');
   const [awbUrl, setAwbUrl] = useState('');
 
+  /**
+   * DR7: opens the printable label / packing slip / invoice (the shop's VD7
+   * pages) through a short-lived signed link. The tab opens on the click
+   * itself, or a popup blocker stops it.
+   */
+  async function openDocument(kind: 'label' | 'packing-slip' | 'invoice') {
+    onError(null);
+    const win = window.open('', '_blank');
+    if (!win) {
+      onError('The browser blocked the new tab. Allow pop-ups for this site and try again.');
+      return;
+    }
+    win.document.write('<p style="font:14px system-ui;padding:24px;color:#475569">Preparing…</p>');
+    try {
+      const { path } = await api.get<{ path: string }>(`/api/admin/shipments/${id}/documents/${kind}`);
+      win.location.replace(`${API_URL}${path}`);
+    } catch (err) {
+      win.close();
+      onError(err instanceof ApiError ? err.message : 'Could not open the document.');
+    }
+  }
+
   async function switchProvider(provider: DeliveryProvider) {
     onError(null);
     setBusy(true);
@@ -602,6 +624,31 @@ function ShipmentDrawer({
             <Field label="Dispatched" value={formatWhen(data.dispatchedAt)} />
           </dl>
 
+          {/* DR7: print from admin (a 4×6 in label with a barcode of the AWB or our number). */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => openDocument('label')}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90"
+            >
+              Print label
+            </button>
+            <button
+              type="button"
+              onClick={() => openDocument('packing-slip')}
+              className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:border-blue-300"
+            >
+              Packing slip
+            </button>
+            <button
+              type="button"
+              onClick={() => openDocument('invoice')}
+              className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:border-blue-300"
+            >
+              Invoice
+            </button>
+          </div>
+
           {data.failureReason && (
             <p className="rounded-xl bg-rose-50 px-3.5 py-2.5 text-sm text-rose-700">{data.failureReason}</p>
           )}
@@ -689,7 +736,15 @@ function ShipmentDrawer({
               </div>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[11px] text-slate-500">
-                  Book it in the Shiprocket panel, then enter the AWB. Automatic booking comes next.
+                  <a
+                    href="https://app.shiprocket.in/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold text-orange-700 hover:underline"
+                  >
+                    Book on Shiprocket ↗
+                  </a>{' '}
+                  (their panel), then enter the AWB here. Booking from this page comes with the Shiprocket API user.
                 </p>
                 <button
                   type="submit"
