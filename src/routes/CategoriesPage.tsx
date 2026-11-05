@@ -6,7 +6,7 @@ import { Modal } from '../components/ui/Modal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { ImageUpload } from '../components/ui/ImageUpload';
 import { useCan } from '../lib/staffContext';
-import type { Category } from '../lib/types';
+import type { Category, CategorySubcategory } from '../lib/types';
 
 // The keys the app knows. Each picks the icon and the built-in photo the app
 // shows when the category has no image of its own.
@@ -21,6 +21,7 @@ export default function CategoriesPage() {
   const { data: categories, loading, error, reload } = useApiData<Category[]>('/api/admin/categories');
   const [formFor, setFormFor] = useState<{ mode: 'create' } | { mode: 'edit'; category: Category } | null>(null);
   const [deleting, setDeleting] = useState<Category | null>(null);
+  const [subsFor, setSubsFor] = useState<Category | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
 
@@ -111,7 +112,36 @@ export default function CategoriesPage() {
                     <span className="text-xs text-slate-400">Built-in</span>
                   ),
               },
-              { header: 'Name', render: (c) => <span className="font-medium">{c.name}</span> },
+              {
+                header: 'Name',
+                render: (c) => (
+                  <div>
+                    <span className="font-medium">{c.name}</span>
+                    {c.product_count != null && <div className="text-xs text-slate-400">{c.product_count} products</div>}
+                  </div>
+                ),
+              },
+              {
+                header: 'Sub-categories',
+                render: (c) => {
+                  const subs = c.subcategories ?? [];
+                  const hidden = subs.filter((s) => s.is_active === false).length;
+                  return (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-slate-600">
+                        {subs.length === 0 ? 'None' : subs.length}
+                        {hidden > 0 && <span className="text-xs text-slate-400"> ({hidden} hidden)</span>}
+                      </span>
+                      <button
+                        onClick={() => setSubsFor(c)}
+                        className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-200"
+                      >
+                        {can.edit ? 'Manage' : 'View'}
+                      </button>
+                    </div>
+                  );
+                },
+              },
               { header: 'Icon', render: (c) => c.icon_key },
               {
                 header: 'Order',
@@ -208,6 +238,16 @@ export default function CategoriesPage() {
             setFormFor(null);
             reload();
           }}
+        />
+      )}
+
+      {subsFor && (
+        <SubcategoriesModal
+          // The list reloads after each change; follow the fresh copy of this category.
+          category={categories?.find((c) => c.id === subsFor.id) ?? subsFor}
+          canEdit={can.edit}
+          onChanged={reload}
+          onClose={() => setSubsFor(null)}
         />
       )}
 
@@ -331,6 +371,176 @@ function CategoryFormModal({
           </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+/**
+ * CT4: the admin's sub-category list for one category — add, rename (moves
+ * the products that use the old name), hide / show, reorder, delete (refused
+ * while products still use it). Products keep the name in products.subcategory.
+ */
+function SubcategoriesModal({
+  category,
+  canEdit,
+  onChanged,
+  onClose,
+}: {
+  category: Category;
+  canEdit: boolean;
+  onChanged: () => void;
+  onClose: () => void;
+}) {
+  const subs = [...(category.subcategories ?? [])].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+  const [newName, setNewName] = useState('');
+  const [editing, setEditing] = useState<{ id: number; name: string } | null>(null);
+  const [busyId, setBusyId] = useState<number | 'new' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const base = `/api/admin/categories/${category.id}/subcategories`;
+
+  async function run(id: number | 'new', action: () => Promise<unknown>, failure: string) {
+    setError(null);
+    setBusyId(id);
+    try {
+      await action();
+      onChanged();
+      return true;
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : failure);
+      return false;
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function add(e: FormEvent) {
+    e.preventDefault();
+    const name = newName.trim();
+    if (!name) return setError('Enter a sub-category name.');
+    if (await run('new', () => api.post(base, { name }), 'Failed to add the sub-category.')) setNewName('');
+  }
+
+  async function rename(sub: CategorySubcategory) {
+    const name = editing?.name.trim() ?? '';
+    if (!name) return setError('A sub-category needs a name.');
+    if (name === sub.name) return setEditing(null);
+    if (await run(sub.id, () => api.patch(`${base}/${sub.id}`, { name }), 'Failed to rename the sub-category.')) setEditing(null);
+  }
+
+  // Same approach as the category list: move the row, then renumber in steps of 10.
+  async function move(sub: CategorySubcategory, direction: -1 | 1) {
+    const ordered = [...subs];
+    const index = ordered.findIndex((s) => s.id === sub.id);
+    const target = index + direction;
+    if (index === -1 || target < 0 || target >= ordered.length) return;
+    ordered.splice(target, 0, ...ordered.splice(index, 1));
+    await run(
+      sub.id,
+      async () => {
+        for (const [i, s] of ordered.entries()) {
+          if (s.sort_order !== (i + 1) * 10) await api.patch(`${base}/${s.id}`, { sortOrder: (i + 1) * 10 });
+        }
+      },
+      'Failed to reorder.'
+    );
+  }
+
+  const small =
+    'rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 hover:border-emerald hover:bg-mint-mist hover:text-emerald-deep disabled:opacity-50';
+
+  return (
+    <Modal title={`Sub-categories · ${category.name}`} onClose={onClose}>
+      <div className="space-y-3">
+        <p className="text-xs text-slate-500">
+          Shops pick one of these for each product, and the app shows them as chips inside {category.name}. Renaming one also
+          renames it on every product that uses it. Hide one to stop new products using it without touching existing ones.
+        </p>
+        {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">{error}</div>}
+        {subs.length === 0 && <div className="rounded-xl bg-slate-50 px-3 py-4 text-center text-sm text-slate-400">No sub-categories yet.</div>}
+        <ul className="max-h-[50vh] divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200">
+          {subs.map((s, i) => (
+            <li key={s.id} className="flex items-center gap-2 px-3 py-2">
+              {editing?.id === s.id ? (
+                <form
+                  className="flex flex-1 items-center gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    rename(s);
+                  }}
+                >
+                  <input
+                    autoFocus
+                    value={editing.name}
+                    onChange={(e) => setEditing({ id: s.id, name: e.target.value })}
+                    className="flex-1 rounded-lg border border-slate-200 bg-slate-50/60 px-2.5 py-1 text-sm"
+                    aria-label={`New name for ${s.name}`}
+                  />
+                  <button type="submit" disabled={busyId === s.id} className="btn-primary px-3 py-1 text-xs">
+                    Save
+                  </button>
+                  <button type="button" onClick={() => setEditing(null)} className="rounded-md bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                <>
+                  <span className={`flex-1 text-sm ${s.is_active === false ? 'text-slate-400 line-through' : 'text-ink'}`}>{s.name}</span>
+                  {s.is_active === false && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">HIDDEN</span>}
+                  {canEdit && (
+                    <>
+                      <button disabled={busyId !== null || i === 0} onClick={() => move(s, -1)} className={small} aria-label={`Move ${s.name} up`}>
+                        ↑
+                      </button>
+                      <button disabled={busyId !== null || i === subs.length - 1} onClick={() => move(s, 1)} className={small} aria-label={`Move ${s.name} down`}>
+                        ↓
+                      </button>
+                      <button disabled={busyId !== null} onClick={() => setEditing({ id: s.id, name: s.name })} className={small}>
+                        Rename
+                      </button>
+                      <button
+                        disabled={busyId !== null}
+                        onClick={() => run(s.id, () => api.patch(`${base}/${s.id}`, { isActive: s.is_active === false }), 'Failed to update.')}
+                        className={small}
+                      >
+                        {s.is_active === false ? 'Show' : 'Hide'}
+                      </button>
+                      <button
+                        disabled={busyId !== null}
+                        onClick={() => {
+                          if (window.confirm(`Delete "${s.name}"? Refused while products still use it.`)) {
+                            run(s.id, () => api.delete(`${base}/${s.id}`), 'Failed to delete.');
+                          }
+                        }}
+                        className="rounded-md border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-600 hover:bg-rose-100 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+        {canEdit && (
+          <form onSubmit={add} className="flex gap-2">
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="New sub-category, e.g. Kurtis"
+              className="flex-1 rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2 text-sm"
+            />
+            <button type="submit" disabled={busyId === 'new'} className="btn-primary px-4 py-2 text-sm">
+              {busyId === 'new' ? 'Adding…' : 'Add'}
+            </button>
+          </form>
+        )}
+        <div className="flex justify-end">
+          <button onClick={onClose} className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200">
+            Done
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 }

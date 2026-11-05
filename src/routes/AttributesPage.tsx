@@ -70,6 +70,8 @@ export default function AttributesPage() {
   const [filterKind, setFilterKind] = useState<FilterKind>('chips');
   const [unit, setUnit] = useState('');
   const [subcategories, setSubcategories] = useState('');
+  // CT4: more categories the filter also shows in, besides "Applies to".
+  const [alsoIn, setAlsoIn] = useState<number[]>([]);
 
   // Inline "add value" state, keyed by attribute so two rows do not share a box.
   const [newValues, setNewValues] = useState<Record<number, string>>({});
@@ -86,6 +88,7 @@ export default function AttributesPage() {
     setFilterKind('chips');
     setUnit('');
     setSubcategories('');
+    setAlsoIn([]);
     setActionError(null);
   }
 
@@ -96,6 +99,8 @@ export default function AttributesPage() {
       filterKind,
       unit: unit.trim(),
       subcategories: subcategories.split(',').map((s) => s.trim()).filter(Boolean),
+      // The main category first, then the extra ones; [] clears the list.
+      categoryIds: categoryId ? [...new Set([Number(categoryId), ...alsoIn])] : [],
     };
   }
 
@@ -211,6 +216,7 @@ export default function AttributesPage() {
     setFilterKind(attr.filter_kind ?? 'chips');
     setUnit(attr.unit ?? '');
     setSubcategories((attr.subcategories ?? []).join(', '));
+    setAlsoIn((attr.category_ids ?? []).filter((id) => id !== attr.category_id));
     setActionError(null);
   }
 
@@ -255,6 +261,29 @@ export default function AttributesPage() {
             </span>
           </label>
         </div>
+
+        {categoryId && (
+          <div>
+            <span className={labelClass}>Also show in</span>
+            <div className="grid max-h-40 grid-cols-2 gap-x-3 gap-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2.5 sm:grid-cols-3">
+              {(categories ?? [])
+                .filter((c) => String(c.id) !== categoryId)
+                .map((c) => (
+                  <label key={c.id} className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={alsoIn.includes(c.id)}
+                      onChange={(e) => setAlsoIn((prev) => (e.target.checked ? [...prev, c.id] : prev.filter((id) => id !== c.id)))}
+                    />
+                    {c.name}
+                  </label>
+                ))}
+            </div>
+            <span className="mt-1 block text-[11px] text-slate-400">
+              One filter for several categories — e.g. Size in Fashion and Footwear — so shops share one list of values.
+            </span>
+          </div>
+        )}
       </div>
     );
   }
@@ -329,7 +358,12 @@ export default function AttributesPage() {
                 )}
               </div>
               <p className="mt-1 text-xs text-slate-400">
-                {attr.category_name ? `${attr.category_name} only` : 'Every category'} · {attr.input_type}
+                {attr.category_names && attr.category_names.length > 1
+                  ? attr.category_names.join(', ')
+                  : attr.category_name
+                    ? `${attr.category_name} only`
+                    : 'Every category'}{' '}
+                · {attr.input_type}
                 {attr.is_filter === false
                   ? ' · not a filter'
                   : ` · filter: ${attr.filter_kind ?? 'chips'}${attr.unit ? ` (${attr.unit})` : ''}`}

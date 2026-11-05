@@ -77,6 +77,18 @@ export interface Category {
   sort_order: number;
   is_active: boolean;
   created_at: string;
+  /** CT1: the admin-owned sub-category list, in order (admin list includes hidden ones). */
+  subcategories?: CategorySubcategory[];
+  /** Products whose category is this one (admin list only). */
+  product_count?: number;
+}
+
+/** One sub-category of a category (CT1); products store its name in products.subcategory. */
+export interface CategorySubcategory {
+  id: number;
+  name: string;
+  sort_order: number;
+  is_active?: boolean;
 }
 
 /** Admin → Service categories (NS4): a kind of service on Near Me → Services. */
@@ -698,6 +710,9 @@ export interface ProductAttribute {
   sort_order: number;
   category_id: number | null;
   category_name: string | null;
+  /** CT1: every category the filter shows in (category_id is the main one); null = only category_id. */
+  category_ids?: number[] | null;
+  category_names?: string[] | null;
   is_active: boolean;
   is_filter?: boolean;
   filter_kind?: FilterKind;
